@@ -59,7 +59,7 @@ Verified against `gears-rust` (all claims spot-checked in source):
 
 | Fact | Evidence | Consequence for GDL |
 |---|---|---|
-| No gear manifest exists. Gear metadata lives **only** in `#[toolkit::gear(name, deps, capabilities, ctor, client, lifecycle)]`, and no `gear.toml` exists anywhere (`find -name gear.toml` = 0) | `libs/toolkit-macros/src/lib.rs` | `gear.gdl` carries **only** genuinely new information — enforced, not merely intended, by `cpt-gearbox-fr-gdl-no-restatement` |
+| No gear manifest exists. Gear metadata lives **only** in `#[toolkit::gear(name, deps, capabilities, ctor, client, lifecycle)]`, and no `gear.toml` exists anywhere (`find -name gear.toml` = 0; the platform added some later, folded into `gear.gdl` on 2026-10-02) | `libs/toolkit-macros/src/lib.rs` | `gear.gdl` carries **only** genuinely new information — enforced, not merely intended, by `cpt-gearbox-fr-gdl-no-restatement` |
 | The gear attribute's location is not uniform: 34 of 44 at `src/gear.rs`, 8 at `src/module.rs`, 2 nested; and `gears/mini-chat/mini-chat` declares **three** gears in one crate | `grep -rln '#\[toolkit::gear('` over `gears/` + `examples/` | projection needs a locator: scan `src/` by default, optional `cargo(attr = …)` to narrow, exactly-one-match required (`cpt-gearbox-fr-attribute-location`) |
 | `capabilities` is a **closed set of 7**: `db, rest, rest_host, stateful, system, grpc_hub, grpc` | same, `Capability` enum | GDL exposes exactly these, nothing more |
 | **`deps` means link-time co-location** — the macro emits `pub use ::crate as _gear_dep_x` to keep `inventory::submit!` alive | same | must be named so it can't be confused with contract consumption |
@@ -383,7 +383,7 @@ product(
     ],
     default_profile = "dev",
     gears = [ use_gear("api-gateway", source = "gears-rust"),
-              use_gear("gear-orchestrator", source = "gears-rust"),
+              use_gear("service-discovery", source = "gears-rust"),
               use_gear("api-contracts", source = "gears-rust"),
               use_gear("api-contracts-consumer", source = "gears-rust"),
               use_gear("payments-audit", source = "gears-rust") ],
@@ -539,7 +539,7 @@ its ID tuple; ties break lexicographically.
    no search — vision §41); `P(a).gears = topo_sort(closure(a))`, so applications **overlap**.
 5. **Structural checks.** >1 `rest_host`/`grpc_hub` per application → GBX0303/0304 (mirrors
    `registry.rs`); `rest_host` inside a Worker → GBX0312 (workers serve via `oop_serve`'s own
-   router); Directory discovery without `gear-orchestrator` → GBX0308 and without `grpc-hub` →
+   router); Directory discovery without `service-discovery` → GBX0308 and without `grpc-hub` →
    GBX0309 (`run_oop_spawn_phase` blocks on `wait_for_grpc_hub_endpoint()`); missing `target_dir` →
    GBX0310; orphan gear → GBX0311. `SelfHosted` always emits GBX0604 (local OS processes only).
 6. **Binding derivation.** Same application ⇒ `Local` / `ColocatedLocal` / no endpoint. Different ⇒
@@ -621,7 +621,7 @@ selected_by = ["product.gdl:use_gear"]
 [[applications]]
 name = "gateway"; kind = "host"; anchor = "api-gateway"
 gears = ["types-registry","authn-resolver","grpc-hub","api-gateway",
-         "api-contracts","api-contracts-consumer","gear-orchestrator"]
+         "api-contracts","api-contracts-consumer","service-discovery"]
 replicas = 1; entrypoint = "run_server"
 bin_name = "gbx-gateway"; crate_name = "gbx-payments-demo-gateway"
 rest_host = "api-gateway"; grpc_hub = "grpc-hub"; needs_db = false
@@ -643,7 +643,7 @@ contract = "api-contracts/PaymentApi@v1"
 provider = "api-contracts"; provider_application = "gateway"
 mode = "remote"                        # DERIVED from placement, never configured
 transport = "rest"; mechanism = "consumes-directory"
-endpoint_source = "directory:gear-orchestrator/api-contracts"
+endpoint_source = "directory:service-discovery/api-contracts"
 critical = false; selected = "explicit:remote/rest"
 
 [[cluster]]
@@ -740,7 +740,7 @@ which is not a cluster provider.
   into the consumer's **ConfigMap** (never env — `remap_gear_env_key` can't express it). The
   proxy-wiring phase installs `StaticEndpointResolver` and the REST resolving client hits the
   Service DNS name. **GBX0603** is emitted so nobody believes a DNS resolver exists.
-- `discovery = "directory"` (opt-in): the gateway subchart runs `gear-orchestrator` + `grpc-hub` on
+- `discovery = "directory"` (opt-in): the gateway subchart runs `service-discovery` + `grpc-hub` on
   a fixed port; workers get `TOOLKIT_DIRECTORY_ENDPOINT` and `APP__OOP_HTTP__ADVERTISE_URI` from
   the downward API with `allow_loopback_advertise: false`. This works today; it is just more moving
   parts, so it isn't the default.
@@ -1750,7 +1750,7 @@ examples would be a guess wearing the clothes of a feature.
 
 It is built now, and what changed first was the corpus rather than the code. Nine of the fourteen
 `gear.gdl` files declare `config_schema`; the other five are correct to say nothing --
-`gear-orchestrator` reads no configuration at all and only *rejects* a stale key,
+`service-discovery` reads no configuration at all and only *rejects* a stale key,
 `api-contracts-consumer` ignores its context, and `api-contracts`'s config struct is a unit struct
 nothing deserializes. Two more, `types-registry` and `cluster`, declare configuration with **zero**
 scalar fields between them -- three `Vec`s and a `BTreeMap` -- so they get no controls either. That
@@ -2313,7 +2313,7 @@ first, and add/remove exercises all of it.
 | `grpc-hub` | `gears/system/grpc-hub` | the only `grpc_hub`; publishes the endpoint `run_oop_spawn_phase` waits on |
 | `authn-resolver` | `gears/system/authn-resolver/authn-resolver` | closure depth 2 |
 | `types-registry` | `gears/system/types-registry/types-registry` | closure depth 3 |
-| `gear-orchestrator` | `gears/system/gear-orchestrator` | `DirectoryService` server |
+| `service-discovery` | `gears/system/service-discovery` | `DirectoryService` server |
 | `api-contracts` | `examples/toolkit/api-contracts/api-contracts` | provides `PaymentApi@v1`+`@v2` over `[local, rest]`; also the `lib_ident != gear_snake` case |
 | `api-contracts-consumer` | `.../api-contracts-consumer` | two real `#[toolkit::consumes]` edges |
 | `cluster` | `gears/system/cluster/cluster` | the provider registry |
@@ -2539,7 +2539,7 @@ cluster.cache.prefix-watch`). `GBX0503` is the neighbouring case -- `standalone`
 cd ../gears-rust
 test -z "$(git status --porcelain -- ':!**/gear.gdl' ':!gears/payments-audit' \
                                     ':!Cargo.toml' ':!Cargo.lock')"
-for p in gears/system/api-gateway gears/system/grpc-hub gears/system/gear-orchestrator \
+for p in gears/system/api-gateway gears/system/grpc-hub gears/system/service-discovery \
          gears/system/authn-resolver gears/system/types-registry gears/system/cluster \
          examples/toolkit/api-contracts; do
   git diff --exit-code HEAD -- "$p/**/*.rs" "$p/**/Cargo.toml" || { echo "MUTATED: $p"; exit 1; }

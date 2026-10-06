@@ -406,3 +406,51 @@ fn account_managements_selector_is_misread_from_its_other_role() {
         "which the real selector, `idp.vendor`, matches by default"
     );
 }
+
+// ---------------------------------------------------------------- selector
+
+/// account-management's shape: two `vendor` fields, one it selects by.
+const TWO_VENDORS: &str = r#"
+#[derive(Default)]
+pub struct AmConfig { pub idp: IdpConfig, pub tr_plugin: TrPluginConfig, pub keycloak: Option<KeycloakConfig> }
+pub struct IdpConfig { pub vendor: String }
+impl Default for IdpConfig { fn default() -> Self { Self { vendor: "cf".to_owned() } } }
+pub struct TrPluginConfig { pub vendor: String }
+impl Default for TrPluginConfig { fn default() -> Self { Self { vendor: "constructorfabric".to_owned() } } }
+pub struct KeycloakConfig { #[serde(default = "default_vendor")] pub vendor: String }
+fn default_vendor() -> String { "keycloak".to_owned() }
+"#;
+
+#[test]
+fn a_selector_path_reads_the_default_of_the_field_it_names() {
+    let files = [file(TWO_VENDORS)];
+    assert_eq!(project_field_str_default(&files, "idp.vendor").unwrap().as_deref(), Some("cf"));
+    assert_eq!(
+        project_field_str_default(&files, "tr_plugin.vendor").unwrap().as_deref(),
+        Some("constructorfabric")
+    );
+    // Through `Option<..>`, and through `#[serde(default = "fn")]`.
+    assert_eq!(
+        project_field_str_default(&files, "keycloak.vendor").unwrap().as_deref(),
+        Some("keycloak")
+    );
+}
+
+#[test]
+fn a_selector_path_that_leads_nowhere_says_where_it_stopped() {
+    let files = [file(TWO_VENDORS)];
+    let err = project_field_str_default(&files, "idp.nope").unwrap_err();
+    assert!(err.contains("`IdpConfig` has no field `nope`"), "{err}");
+    let err = project_field_str_default(&files, "missing.vendor").unwrap_err();
+    assert!(err.contains("no `*Config` struct"), "{err}");
+    let err = project_field_str_default(&files, "idp.vendor.deeper").unwrap_err();
+    assert!(err.contains("not a struct"), "{err}");
+}
+
+#[test]
+fn the_real_account_management_selects_by_idp_vendor() {
+    // The corpus case this exists for: the first `vendor` default in the crate
+    // is `tr_plugin`'s, the one the runtime selects the IdP plugin by is not.
+    let files = require!(tree("gears/system/account-management/account-management"));
+    assert_eq!(project_field_str_default(&files, "idp.vendor").unwrap().as_deref(), Some("cf"));
+}

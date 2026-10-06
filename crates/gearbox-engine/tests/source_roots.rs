@@ -28,6 +28,7 @@ fn gear_gdl(description: &str) -> String {
     format!(
         r#"
 gear(
+    maturity = "stable",
     name = "Demo",
     description = "{description}",
     category = "platform",

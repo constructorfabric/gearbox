@@ -38,7 +38,7 @@ fn project(files: &[RustFile]) -> ProjectedGear {
 #[test]
 fn one_per_installation_is_read_rather_than_left_unmodelled() {
     let projected = parse(&parse_quote!(
-        name = "gear-orchestrator",
+        name = "service-discovery",
         capabilities = [grpc, system, rest],
         one_per_installation = true
     ));

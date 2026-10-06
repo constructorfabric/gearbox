@@ -15,7 +15,7 @@ remedy at the point it is raised
 (`cpt-gearbox-nfr-actionable-diagnostics`), which is per-occurrence and
 so is not listed here.
 
-Codes: **102**.
+Codes: **106**.
 
 ## `GBX01xx` — Parsing and evaluating GDL
 
@@ -432,6 +432,10 @@ nothing pointing back at the description.
 | [GBX0318](#gbx0318) | warning | a gear's roles cannot all be deployed |
 | [GBX0319](#gbx0319) | error | an application names a role its anchor does not declare |
 | [GBX0320](#gbx0320) | warning | two applications register the same directory name |
+| [GBX0321](#gbx0321) | error | gear is at design maturity |
+| [GBX0322](#gbx0322) | warning | gear is experimental |
+| [GBX0323](#gbx0323) | info | gear is at preview |
+| [GBX0324](#gbx0324) | warning | gear is deprecated |
 
 ### GBX0301
 
@@ -569,7 +573,7 @@ router and needs no `rest_host`, while it has no such second path for
 gRPC.
 
 The corpus makes this reachable rather than theoretical: `cluster` and
-`gear-orchestrator` both declare `grpc` and neither declares `deps`, so
+`service-discovery` both declare `grpc` and neither declares `deps`, so
 nothing drags a hub in beside them.
 
 *Asserts a limitation of the runtime, so every occurrence cites the source that proves it.*
@@ -716,6 +720,40 @@ the third can collide.
 service is load balancing; between two that own disjoint state it is
 corruption, and only the gear can say which it is
 (ADR `cpt-gearbox-adr-one-per-installation`).
+
+### GBX0321
+
+**gear is at design maturity**
+
+A product selects a gear that is described but has no code yet.
+
+`maturity = "design"` in its `gear.gdl`: the catalogue knows the gear's
+id, purpose and documents, and there is no crate to link. Distinct from
+GBX0301 because "not in the catalogue" sends the reader looking for a
+typo or a closed source root, and neither is the problem.
+
+### GBX0322
+
+**gear is experimental**
+
+A product links a gear its description calls `experimental`: its API
+and behaviour may change freely. A warning, because using one is a
+choice a product may make on purpose -- but it should be a choice.
+
+### GBX0323
+
+**gear is at preview**
+
+A product links a gear at `preview`: usable, not declared stable.
+Information, not a warning: most of the platform is here today, and a
+warning on every product would be noise that hides GBX0322 and GBX0324.
+
+### GBX0324
+
+**gear is deprecated**
+
+A product links a gear its description calls `deprecated`: still
+available, not for new products.
 
 ## `GBX04xx` — Contract bindings and severability
 
@@ -897,8 +935,8 @@ is one string in one attribute.
 | [GBX0515](#gbx0515) | error | plugin consumed directly instead of through its host |
 | [GBX0516](#gbx0516) | error | plugin extension point could not be determined |
 | [GBX0517](#gbx0517) | info | several plugins share a vendor for one extension point |
-| [GBX0518](#gbx0518) | error | plugin fills a point its host does not declare |
-| [GBX0519](#gbx0519) | error | plugin fills a point no described gear declares |
+| [GBX0518](#gbx0518) | error | plugin implements a point its host does not declare |
+| [GBX0519](#gbx0519) | error | plugin implements a point no described gear declares |
 | [GBX0520](#gbx0520) | info | cluster backend decides a capability at run time |
 | [GBX0521](#gbx0521) | error | a declared provider options struct cannot be read |
 | [GBX0522](#gbx0522) | error | provider option is not one the backend reads |
@@ -1091,7 +1129,7 @@ implementations is legitimate -- selection may be per-tenant at runtime.
 
 ### GBX0518
 
-**plugin fills a point its host does not declare**
+**plugin implements a point its host does not declare**
 
 A gear lists a plugin under a host that does not declare that point.
 
@@ -1110,9 +1148,9 @@ client is not a boundary (`cpt-gearbox-fr-rpc-writes-opt-in`).
 
 ### GBX0519
 
-**plugin fills a point no described gear declares**
+**plugin implements a point no described gear declares**
 
-A plugin fills a spec no described gear declares as an extension point.
+A plugin implements a spec no described gear declares as an extension point.
 
 The plugin names only the spec; which trait and which SDK are the host's
 to say. With no host describing it, the fill has nothing to join to, so
@@ -1218,12 +1256,12 @@ whole point: the feature is selected two lines away, in the same file.
 
 **a plugin implements none of its point's trait**
 
-A gear declares it fills a point, and its crate implements none of that
+A gear declares it implements a point, and its crate implements none of that
 point's trait.
 
 A warning, because the implementation is evidence and not the source of
 the role: an impl can sit in a generic wrapper or a macro this reader
-cannot see. But the ordinary cause is a `fills` naming the wrong spec,
+cannot see. But the ordinary cause is an `implements` naming the wrong spec,
 and that one is worth a line.
 
 ## `GBX06xx` — Capabilities the runtime does not implement

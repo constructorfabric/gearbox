@@ -115,6 +115,40 @@ pub enum Visibility {
     Internal,
 }
 
+/// How much a gear with code promises, as its description declares it.
+///
+/// Ordered by promise, so `<` reads as "less settled than" -- except
+/// `Deprecated`, which is last because it is the end of the line, not because
+/// it promises most. A gear with no code is not here: it is `maturity =
+/// "design"`, kept in [`Catalogue::designs`].
+///
+/// No `Default`. The description must say, and a missing value is refused at
+/// evaluation: `Stable` as a default makes forgetting the field a promise.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum Maturity {
+    /// Code exists; its API and behaviour may change freely.
+    Experimental,
+    /// Usable, but nobody has declared it stable.
+    Preview,
+    /// Supported for ordinary production use.
+    Stable,
+    /// Still available; not for new products.
+    Deprecated,
+}
+
+impl Maturity {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Experimental => "experimental",
+            Self::Preview => "preview",
+            Self::Stable => "stable",
+            Self::Deprecated => "deprecated",
+        }
+    }
+}
+
 /// A gear's lifecycle declaration.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 pub struct LifecycleDecl {
@@ -341,6 +375,13 @@ pub struct GearDescriptor {
     #[serde(default)]
     pub visibility: Visibility,
 
+    /// Declared in `gear(maturity = ...)`, and required there.
+    ///
+    /// Not carried into the lock, like `config_schema`: it is what the gear
+    /// promises, not something resolution decided. A product reports what it
+    /// uses below `stable` (GBX0322-0324) instead.
+    pub maturity: Maturity,
+
     /// Which declared source this gear was read from.
     pub source: SourceId,
 
@@ -392,16 +433,16 @@ pub struct GearDescriptor {
     ///
     /// Declared in the description by GTS spec and verified against the SDK. A
     /// gear may have several: `mini-chat` declares an audit point and a
-    /// model-policy point, each filled independently.
+    /// model-policy point, each implemented independently.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extension_points: Vec<ExtensionPointDecl>,
 
-    /// The extension point this gear *fills*, if it is a plugin.
+    /// The extension point this gear *implements*, if it is a plugin.
     ///
     /// Declared, like the host's side. A gear may be both: bss-rate-provider
-    /// fills the ledger's point and declares one of its own.
+    /// implements the ledger's point and declares one of its own.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fills: Option<PluginFill>,
+    pub implements: Option<PluginImpl>,
 
     /// The vendor string this gear's config selects a plugin by.
     ///
@@ -544,6 +585,49 @@ pub struct PendingGear {
     pub category: Option<String>,
 }
 
+/// A gear described before it has code: `maturity = "design"` in its `gear.gdl`.
+///
+/// **A separate collection, not a state of [`GearDescriptor`].** A descriptor's
+/// facts are projected from a crate -- its package, capabilities, contracts --
+/// and a design gear has none, so as a descriptor every one of them would be a
+/// default standing in for "unknown", and every consumer of `gears` would have
+/// to learn to skip it. Kept apart, the resolver and the generator never see a
+/// design gear at all, and the one thing that does -- naming it in
+/// `use_gear(...)` -- gets its own diagnostic (GBX0321) instead of
+/// "unknown gear".
+///
+/// What it carries is what the platform's `gear.toml` carried for these gears
+/// before it was retired: a name, a description, a category, plus where its
+/// SDK and documents are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub struct DesignGear {
+    /// Declared, not projected: there is no attribute yet to project it from.
+    pub id: GearId,
+
+    pub display_name: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+
+    pub source: SourceId,
+
+    pub gdl_path: RelPath,
+
+    /// The SDK crate, when one exists ahead of the gear -- `llm-gateway` and
+    /// `model-registry` publish their SDKs first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdk: Option<CargoRef>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub docs: Option<GearDocs>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<crate::diagnostics::Location>,
+}
+
 /// Documents describing one gear, all relative to its source root.
 ///
 /// Paths rather than content: the catalogue stays small, and an editor can open
@@ -627,7 +711,7 @@ pub struct GtsTypeDecl {
 pub struct ExtensionPointDecl {
     /// The full GTS type id of the plugin spec, e.g.
     /// `cf.toolkit.plugins.plugin.v1~cf.core.authn_resolver.plugin.v1~`. The
-    /// join key: a plugin's [`PluginFill::spec`] matches this.
+    /// join key: a plugin's [`PluginImpl::spec`] matches this.
     pub spec: String,
 
     /// The interface plugins register under, as written, e.g.
@@ -654,6 +738,13 @@ pub struct ExtensionPointDecl {
     /// host was read from, which is what makes it resolvable by anyone who knows
     /// where that root is.
     pub sdk: CargoRef,
+
+    /// The host's config key it selects a plugin by, as written in
+    /// `extension_point(selector = ...)`: a dotted path such as `idp.vendor`.
+    /// Absent means the top-level `vendor`. The *value* it defaults to is the
+    /// gear's [`GearDescriptor::vendor_selector`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
 }
 
 impl ExtensionPointDecl {
@@ -664,10 +755,10 @@ impl ExtensionPointDecl {
     }
 }
 
-/// The extension point a plugin gear fills.
+/// The extension point a plugin gear implements.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
-pub struct PluginFill {
-    /// The full GTS type id of the spec this plugin fills; matches
+pub struct PluginImpl {
+    /// The full GTS type id of the spec this plugin implements; matches
     /// [`ExtensionPointDecl::spec`] on its host.
     pub spec: String,
 
@@ -691,8 +782,8 @@ pub struct PluginFill {
     pub default_priority: Option<i64>,
 }
 
-impl PluginFill {
-    /// How the filled point is spelled in diagnostics: the host's trait when the
+impl PluginImpl {
+    /// How the implemented point is spelled in diagnostics: the host's trait when the
     /// catalogue has joined it, the spec when no described gear declares it.
     #[must_use]
     pub fn describe(&self) -> String {
@@ -772,6 +863,11 @@ pub struct Catalogue {
     pub contracts: BTreeMap<ContractId, ContractDescriptor>,
     pub sources: BTreeMap<SourceId, ResolvedSource>,
 
+    /// Gears described before they have code. Never resolved; see
+    /// [`DesignGear`].
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub designs: BTreeMap<GearId, DesignGear>,
+
     /// Problems found while building the catalogue.
     #[serde(default)]
     pub diagnostics: Diagnostics,
@@ -798,7 +894,7 @@ impl Catalogue {
     pub fn implementations_of(&self, point: &ExtensionPointDecl) -> Vec<&GearDescriptor> {
         self.gears
             .values()
-            .filter(|g| g.fills.as_ref().is_some_and(|f| f.spec == point.spec))
+            .filter(|g| g.implements.as_ref().is_some_and(|f| f.spec == point.spec))
             .collect()
     }
 

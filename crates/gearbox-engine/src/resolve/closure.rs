@@ -75,11 +75,10 @@ pub fn expand(
                 .iter()
                 .find(|s| &s.gear == gear)
                 .and_then(|s| s.declared_at.clone());
-            diagnostics.push(unknown(
-                gear,
-                None,
-                gearbox_ir::Location::or_file(declared_at.as_ref(), uri),
-            ));
+            let at = gearbox_ir::Location::or_file(declared_at.as_ref(), uri);
+            diagnostics.push(
+                at_design(catalogue, gear, &at).unwrap_or_else(|| unknown(gear, None, at)),
+            );
             continue;
         }
         closure
@@ -102,11 +101,11 @@ pub fn expand(
                 continue;
             }
             if !catalogue.gears.contains_key(&plugin.gear) {
-                diagnostics.push(unknown_plugin(
-                    &plugin.gear,
-                    &selection.gear,
-                    gearbox_ir::Location::or_file(selection.declared_at.as_ref(), uri),
-                ));
+                let at = gearbox_ir::Location::or_file(selection.declared_at.as_ref(), uri);
+                diagnostics.push(
+                    at_design(catalogue, &plugin.gear, &at)
+                        .unwrap_or_else(|| unknown_plugin(&plugin.gear, &selection.gear, at)),
+                );
                 continue;
             }
             let reason = InclusionReason::PluginOf {
@@ -130,7 +129,11 @@ pub fn expand(
         };
         for dep in &descriptor.colocated_deps {
             if !catalogue.gears.contains_key(dep) {
-                diagnostics.push(unknown(dep, Some(&current), Location::file(uri.to_owned())));
+                let at = Location::file(uri.to_owned());
+                diagnostics.push(
+                    at_design(catalogue, dep, &at)
+                        .unwrap_or_else(|| unknown(dep, Some(&current), at)),
+                );
                 continue;
             }
             let reason = InclusionReason::ColocatedBy {
@@ -183,6 +186,111 @@ fn applies(
     profile: &gearbox_ir::ProfileId,
 ) -> bool {
     profiles.is_empty() || profiles.contains(profile)
+}
+
+/// GBX0321, when a gear absent from `gears` is a design gear.
+///
+/// Asked before "unknown gear" at every place a gear id fails to resolve:
+/// GBX0301 says to look for a typo or a closed source root, and for a design
+/// gear neither is the answer. Shared with `validate`, which checks
+/// selections without resolving.
+pub(crate) fn at_design(catalogue: &Catalogue, gear: &GearId, at: &gearbox_ir::Location) -> Option<Diagnostic> {
+    let design = catalogue.designs.get(gear)?;
+    Some(
+        Diagnostic::error(
+            DiagnosticCode::TopologyDesignGear,
+            format!(
+                "`{gear}` is at design maturity: it is described, and there is no crate to \
+                 build yet"
+            ),
+            format!(
+                "`{}` in source `{}` says `maturity = \"design\"`; leave the gear out of the \
+                 product until it has code{}",
+                design.gdl_path,
+                design.source,
+                design
+                    .docs
+                    .as_ref()
+                    .and_then(|d| d.prd.as_ref().or(d.design.as_ref()))
+                    .map(|doc| format!(", and see `{doc}` for what is planned"))
+                    .unwrap_or_default()
+            ),
+        )
+        .at(at.clone()),
+    )
+}
+
+/// GBX0322-0324: one diagnostic per gear in `members` below `stable`.
+///
+/// Every member, not only the selected ones: a co-located dependency or a
+/// plugin is linked into the same binary, and "nobody chose it" is not a
+/// reason it promises more. Each is anchored where a reader can act -- the
+/// `use_gear(...)` that selected it, or that selected its host -- and the
+/// file otherwise, with the reason it is there in the message.
+///
+/// Shared with `validate`, which passes only the selections because it does
+/// not resolve.
+pub(crate) fn maturity_diagnostics<'m>(
+    catalogue: &Catalogue,
+    members: impl IntoIterator<Item = (&'m GearId, &'m [InclusionReason])>,
+    intent: &ProductIntent,
+    uri: &str,
+    diagnostics: &mut Diagnostics,
+) {
+    let selected_at = |gear: &GearId| {
+        intent
+            .selected_gears
+            .iter()
+            .find(|s| &s.gear == gear)
+            .and_then(|s| s.declared_at.clone())
+    };
+    for (gear, reasons) in members {
+        let Some(descriptor) = catalogue.gears.get(gear) else {
+            continue;
+        };
+        let (code, what, help) = match descriptor.maturity {
+            gearbox_ir::Maturity::Stable => continue,
+            gearbox_ir::Maturity::Experimental => (
+                DiagnosticCode::TopologyExperimentalGear,
+                "experimental: its API and behaviour may change freely",
+                "pin the gear's version, or wait for its owners to raise it to `preview`",
+            ),
+            gearbox_ir::Maturity::Preview => (
+                DiagnosticCode::TopologyPreviewGear,
+                "at preview: usable, but not declared stable",
+                "nothing to do for now; this says what the product depends on",
+            ),
+            gearbox_ir::Maturity::Deprecated => (
+                DiagnosticCode::TopologyDeprecatedGear,
+                "deprecated: still available, not for new products",
+                "see the gear's documents for what replaces it",
+            ),
+        };
+        let mut why = Vec::new();
+        let mut at = None;
+        for reason in reasons {
+            match reason {
+                InclusionReason::Selected => at = at.or_else(|| selected_at(gear)),
+                InclusionReason::ColocatedBy { gear: by } => {
+                    why.push(format!("co-located by `{by}`"));
+                }
+                InclusionReason::PluginOf { host, .. } => {
+                    why.push(format!("a plugin of `{host}`"));
+                    at = at.or_else(|| selected_at(host));
+                }
+            }
+        }
+        let message = if why.is_empty() {
+            format!("`{gear}` is {what}")
+        } else {
+            format!("`{gear}` ({}) is {what}", why.join(", "))
+        };
+        diagnostics.push(
+            Diagnostic::new(code, message)
+                .with_help(help)
+                .at(gearbox_ir::Location::or_file(at.as_ref(), uri)),
+        );
+    }
 }
 
 /// A plugin named under a host that the catalogue does not have.

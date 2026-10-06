@@ -27,6 +27,7 @@ import { ProductStore } from "../product-store";
 import { RevealService } from "../reveal-service";
 import { ADD_GEAR, SHOW_PRODUCT } from "../shell/session-command-ids";
 import { GEARBOX_DRAG_MIME } from "../ai/gearbox-context";
+import { MaturityBadge } from "../gear/gear-facts";
 
 @injectable()
 export class CatalogueWidget extends ReactWidget {
@@ -296,6 +297,8 @@ export class CatalogueWidget extends ReactWidget {
       <div
         key={key}
         className={`gbx-row ${row.kind === "pending" ? "gbx-pending" : ""} ${
+          row.kind === "design" ? "gbx-design-row" : ""
+        } ${row.kind === "projected" && row.gear.maturity === "deprecated" ? "gbx-deprecated-row" : ""} ${
           selected ? "gbx-selected" : ""
         } ${stalled ? "gbx-stalled" : ""}`}
         // Operable from the keyboard, because a panel in an IDE that only
@@ -348,11 +351,24 @@ export class CatalogueWidget extends ReactWidget {
           {row.kind === "projected" ? (
             <>
               <span className="gbx-id">{row.gear.id}</span>
+              <MaturityBadge maturity={row.gear.maturity} />
               {(row.gear.runtime_caps ?? []).map((cap) => (
                 <span className="gbx-badge" key={cap}>
                   {cap}
                 </span>
               ))}
+            </>
+          ) : row.kind === "design" ? (
+            // Finished, not waiting: the badge says what it is, where a pending
+            // row says what it is still doing.
+            <>
+              <span className="gbx-id">{row.gear.id}</span>
+              <span
+                className="gbx-badge gbx-design"
+                title="Described at design maturity: no crate yet, so it cannot be added to a product"
+              >
+                design
+              </span>
             </>
           ) : (
             // No id and no badges, because neither exists yet. Saying so beats an
@@ -508,7 +524,7 @@ function matches(row: Row, filter: string): boolean {
   if (needle.length === 0) return true;
   const haystack = [
     row.kind === "pending" ? (row.gear.display_name ?? "") : row.gear.display_name,
-    row.kind === "projected" ? row.gear.id : "",
+    row.kind === "pending" ? "" : row.gear.id,
     row.gear.category ?? "",
     row.gear.gdl_path,
   ];

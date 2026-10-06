@@ -71,6 +71,7 @@ pub trait ThingApi: Send + Sync {{}}
         format!(
             r#"
 gear(
+    maturity = "stable",
     name = "Provider",
     description = "d",
     category = "core-functionality",
@@ -115,6 +116,7 @@ fn root_with_consumer(owner: &str, roles: &str) -> PathBuf {
         consumer.join("gear.gdl"),
         r#"
 gear(
+    maturity = "stable",
     name = "Consumer",
     description = "d",
     category = "core-functionality",

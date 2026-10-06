@@ -15,7 +15,7 @@
  * previous comment-only form when it does not. In the description the
  * difference is the next declaration each shape needs, written where it
  * goes -- and for a plugin with no host chosen, written as a *comment*,
- * because a `fills` naming a spec no described gear declares is refused
+ * because an `implements` naming a spec no described gear declares is refused
  * (GBX0519). A scaffold must not produce a description that is already wrong.
  */
 export type GearKind = "minimal" | "service" | "plugin";

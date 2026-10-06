@@ -85,7 +85,7 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
    *
    * `service` by default rather than `minimal`, and the corpus is the reason: of
    * the fourteen described gears, none is a bare crate with a name -- every one
-   * either does something on its own or fills another gear's extension point. The
+   * either does something on its own or implements another gear's extension point. The
    * minimal shape is what this panel wrote before there were kinds, and it stays
    * for a crate that is being described before it does anything.
    */
@@ -97,7 +97,7 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
   protected destination = "";
   protected destinationTouched = false;
   /**
-   * The host and point a `plugin` scaffold fills, as `hostId::traitIdent`.
+   * The host and point a `plugin` scaffold implements, as `hostId::traitIdent`.
    *
    * Empty means no host chosen, which the engine reads as "keep the locator
    * commented" -- so the wizard has a state for "I know it is a plugin but not
@@ -384,7 +384,7 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
   }
 
   /**
-   * Which host and point this plugin fills.
+   * Which host and point this plugin implements.
    *
    * **The control that makes the kind mean something.** `Plugin` chose a
    * different `gear.gdl` all along, but every declaration in it was a comment
@@ -416,7 +416,7 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
     }
     return (
       <label>
-        What it fills
+        What it implements
         <select
           data-create-gear-point
           value={this.point}
@@ -451,8 +451,8 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
             that do. */}
         {locator.kind === "none" && (
           <span className="gbx-create-note">
-            Without a host, `fills` is written as a comment: a spec no described gear declares
-            is refused (GBX0519), so the declaration waits until you know what it fills.
+            Without a host, `implements` is written as a comment: a spec no described gear declares
+            is refused (GBX0519), so the declaration waits until you know what it implements.
           </span>
         )}
         {locator.kind === "ready" && (
@@ -591,7 +591,7 @@ export class CreateGearWidget extends ReactWidget implements OwnedWidget {
               }}
             >
               <option value="service">Service — a gear that does something</option>
-              <option value="plugin">Plugin — fills another gear&apos;s extension point</option>
+              <option value="plugin">Plugin — implements another gear&apos;s extension point</option>
               <option value="minimal">Minimal — a crate and a name</option>
             </select>
           </label>

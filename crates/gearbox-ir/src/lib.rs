@@ -17,8 +17,8 @@ pub mod resolved;
 
 pub use catalogue::{
     CargoFeature, Catalogue, ConfigFieldDecl, ConfigFieldType, ConfigSchema, DeclaredRole,
-    EndpointDecl, ExtensionPointDecl, GearDescriptor, GearDocs, GtsTypeDecl, LifecycleDecl,
-    LoadStage, PendingGear, PluginFill, ResolvedSource, RuntimeCap, SourceKind, Visibility,
+    DesignGear, EndpointDecl, ExtensionPointDecl, GearDescriptor, GearDocs, GtsTypeDecl, LifecycleDecl,
+    LoadStage, Maturity, PendingGear, PluginImpl, ResolvedSource, RuntimeCap, SourceKind, Visibility,
 };
 pub use contract::{
     CargoRef, ContractDescriptor, ContractKind, ContractVersion, GrpcProjection,

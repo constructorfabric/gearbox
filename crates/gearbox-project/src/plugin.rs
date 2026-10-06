@@ -117,7 +117,7 @@ pub fn public_traits(files: &[RustFile]) -> BTreeSet<String> {
 
 /// The traits a crate implements outside test code, by last path segment.
 ///
-/// Evidence for a declared `fills`, never the source of it. **Test code does not
+/// Evidence for a declared `implements`, never the source of it. **Test code does not
 /// count**: a host's own tests implement its plugin trait with mocks --
 /// usage-collector, license-resolver and credstore all do -- so a file compiled
 /// only under `cfg(test)`, or an impl gated that way, is skipped.
@@ -304,6 +304,116 @@ fn vendor_from_serde_default(files: &[RustFile]) -> VendorDefault {
         }
     }
     out
+}
+
+/// The string a config field at `path` defaults to -- `"idp.vendor"` reads
+/// the `vendor` default of whatever type the config's `idp` field has.
+///
+/// **What it walks.** The root is the one `*Config` struct with a field named
+/// after the first segment; every segment before the last is a field whose
+/// type (through `Option<..>`) names the next struct; the last is read from
+/// that struct's `impl Default` or its `#[serde(default = "fn")]` -- the two
+/// spellings [`project_vendor_default`] reads, for the same reason.
+///
+/// # Errors
+/// A sentence saying where the walk stopped: no root, more than one, a field
+/// whose type is not a struct in the crate, or a default that is not a
+/// readable string. A declared selector that cannot be read is a description
+/// error, not "no default".
+pub fn project_field_str_default(files: &[RustFile], path: &str) -> Result<Option<String>, String> {
+    let segments: Vec<&str> = path.split('.').collect();
+    let structs: std::collections::BTreeMap<String, &syn::ItemStruct> = files
+        .iter()
+        .flat_map(|f| f.ast.items.iter())
+        .filter_map(|item| match item {
+            syn::Item::Struct(s) => Some((s.ident.to_string(), s)),
+            _ => None,
+        })
+        .collect();
+    let field_of = |s: &syn::ItemStruct, name: &str| -> Option<syn::Field> {
+        s.fields
+            .iter()
+            .find(|f| f.ident.as_ref().is_some_and(|i| i == name))
+            .cloned()
+    };
+
+    let roots: Vec<&str> = structs
+        .iter()
+        .filter(|(name, s)| name.ends_with("Config") && field_of(s, segments[0]).is_some())
+        .map(|(name, _)| name.as_str())
+        .collect();
+    let mut owner = match roots.as_slice() {
+        [one] => (*one).to_owned(),
+        [] => return Err(format!("no `*Config` struct in the crate has a field `{}`", segments[0])),
+        many => {
+            return Err(format!(
+                "`{}` is a field of several config structs ({}); the selector cannot say which",
+                segments[0],
+                many.join(", ")
+            ));
+        }
+    };
+
+    for segment in &segments[..segments.len() - 1] {
+        let field = structs
+            .get(&owner)
+            .and_then(|s| field_of(s, segment))
+            .ok_or_else(|| format!("`{owner}` has no field `{segment}`"))?;
+        let next = struct_type_name(&field.ty)
+            .filter(|name| structs.contains_key(name))
+            .ok_or_else(|| format!("`{owner}.{segment}` is not a struct declared in the crate"))?;
+        owner = next;
+    }
+
+    let last = segments[segments.len() - 1];
+    let field = structs
+        .get(&owner)
+        .and_then(|s| field_of(s, last))
+        .ok_or_else(|| format!("`{owner}` has no field `{last}`"))?;
+
+    // `impl Default for <owner>` first, as `project_vendor_default` does.
+    for item in files.iter().flat_map(|f| f.ast.items.iter()) {
+        let syn::Item::Impl(imp) = item else { continue };
+        let is_default = imp
+            .trait_
+            .as_ref()
+            .is_some_and(|(_, p, _)| last_segment(p) == "Default");
+        let on_owner = matches!(&*imp.self_ty, syn::Type::Path(p) if last_segment(&p.path) == owner);
+        if !(is_default && on_owner) {
+            continue;
+        }
+        if let Some((_, expr)) = struct_literal_fields(imp).into_iter().find(|(n, _)| n == last) {
+            return str_literal(expr)
+                .or_else(|| str_const(files, expr))
+                .map(Some)
+                .ok_or_else(|| format!("`{owner}::default().{last}` is not a readable string"));
+        }
+    }
+    let read = serde_default_fn(&field.attrs);
+    if let Some(name) = read.name {
+        let body = free_fn_body(files, &name)
+            .ok_or_else(|| format!("`{owner}.{last}` defaults through `{name}`, which is not found"))?;
+        return str_literal(body)
+            .or_else(|| str_const(files, body))
+            .map(Some)
+            .ok_or_else(|| format!("`{name}()` does not return a readable string"));
+    }
+    Ok(None)
+}
+
+/// The struct a field's type names, through one `Option<..>`.
+fn struct_type_name(ty: &syn::Type) -> Option<String> {
+    let syn::Type::Path(p) = ty else { return None };
+    let segment = p.path.segments.last()?;
+    if segment.ident == "Option" {
+        if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+            && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+        {
+            return struct_type_name(inner);
+        }
+        return None;
+    }
+    Some(segment.ident.to_string())
 }
 
 /// What reading `#[serde(default = "name")]` off a field yielded.

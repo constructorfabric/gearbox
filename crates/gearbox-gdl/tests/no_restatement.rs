@@ -57,7 +57,7 @@ const PROJECTED_FIELDS: &[(&str, &str)] = &[
 #[test]
 fn every_projected_gear_field_is_refused_by_name() {
     for (field, owning_attribute) in PROJECTED_FIELDS {
-        let src = format!("gear({PACKAGE}, {field})\n");
+        let src = format!("gear(maturity = \"stable\", {PACKAGE}, {field})\n");
         let (codes, message) = eval(&src);
 
         assert_eq!(
@@ -87,7 +87,7 @@ fn projected_contract_fields_are_refused_on_provide() {
         let src = format!(
             r#"
 SDK = cargo(crate_name = "s", lib = "s")
-gear({PACKAGE}, provides = [provide(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK, {field})])
+gear(maturity = "stable", {PACKAGE}, provides = [provide(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK, {field})])
 "#
         );
         let (codes, message) = eval(&src);
@@ -111,7 +111,7 @@ fn projected_contract_fields_are_refused_on_consume() {
         let src = format!(
             r#"
 SDK = cargo(crate_name = "s", lib = "s")
-gear({PACKAGE}, consumes = [consume(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK, from_ = "other", {field})])
+gear(maturity = "stable", {PACKAGE}, consumes = [consume(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK, from_ = "other", {field})])
 "#
         );
         let (codes, _) = eval(&src);
@@ -129,6 +129,7 @@ fn a_declared_field_is_still_accepted() {
     let src = format!(
         r#"
 gear(
+    maturity = "stable",
     {PACKAGE},
     name = "Demo",
     description = "d",
@@ -155,14 +156,14 @@ gear(
 fn an_unknown_field_is_still_a_distinct_code() {
     // A typo is not a restatement; conflating them would send the author
     // looking for a Rust attribute that does not exist.
-    let (codes, _) = eval(&format!(r#"gear({PACKAGE}, kind = "service")"#));
+    let (codes, _) = eval(&format!(r#"gear(maturity = "stable", {PACKAGE}, kind = "service")"#));
     assert_eq!(codes, [DiagnosticCode::GdlUnknownArgument]);
 }
 
 #[test]
 fn the_attr_locator_is_accepted_on_package() {
     let src = r#"
-gear(package = cargo(crate_name = "c", lib = "c", attr = "src/gear.rs"), name = "D")
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c", attr = "src/gear.rs"), name = "D")
 "#;
     let (codes, message) = eval(src);
     assert!(codes.is_empty(), "{codes:?} {message}");
@@ -177,7 +178,7 @@ fn a_cluster_requirement_must_name_its_profile() {
     // `ProfileNotBound`. The platform's only real consumer binds `"event-broker"`,
     // which a default would have got silently wrong.
     let (codes, message) = eval(&format!(
-        r#"gear({PACKAGE}, name = "D", requires = [cluster.cache()])"#
+        r#"gear(maturity = "stable", {PACKAGE}, name = "D", requires = [cluster.cache()])"#
     ));
     assert!(
         !codes.is_empty(),

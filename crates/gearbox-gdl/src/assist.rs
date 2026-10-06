@@ -248,12 +248,27 @@ pub fn parameters(docs: &DocModule, call: &str, already: &[String]) -> Vec<Sugge
         .iter()
         .chain(function.params.pos_or_named.iter())
         .filter(|param| !already.iter().any(|seen| seen == &param.name))
+        .filter(|param| !refused_only(call, &param.name))
         .map(|param| Suggestion {
             label: param.name.clone(),
             detail: detail_of(param),
             type_name: Some(param.typ.to_string()),
         })
         .collect()
+}
+
+/// Parameters a call accepts only so it can refuse them by name.
+///
+/// They exist in the signature so the error can say which attribute owns the
+/// fact (GBX0210), or what a renamed keyword became -- not to be written.
+/// Offering them in completion invites exactly the mistake they catch. `id`
+/// is not here: a `maturity = "design"` gear writes it.
+fn refused_only(call: &str, param: &str) -> bool {
+    call == "gear"
+        && matches!(
+            param,
+            "fills" | "runtime_caps" | "colocated_deps" | "lifecycle" | "client" | "cluster_providers"
+        )
 }
 
 /// The documentation for one name, as the interpreter carries it.

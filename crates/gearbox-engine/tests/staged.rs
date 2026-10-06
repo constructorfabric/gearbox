@@ -45,6 +45,7 @@ macro_rules! require {
 enum Seen {
     Discovered(usize),
     Declared(String),
+    Design(String),
     DeclarationComplete(usize),
     Projected(String),
     Joined(String),
@@ -56,6 +57,7 @@ fn record(root: &SourceRoot) -> (Vec<Seen>, gearbox_engine::CatalogueScan) {
         seen.push(match event {
             LoadEvent::Discovered { total } => Seen::Discovered(total),
             LoadEvent::Declared(p) => Seen::Declared(p.gdl_path.as_str().to_owned()),
+            LoadEvent::Design(d) => Seen::Design(d.id.as_str().to_owned()),
             LoadEvent::DeclarationComplete { declared, .. } => Seen::DeclarationComplete(declared),
             LoadEvent::Projected(g) => Seen::Projected(g.id.as_str().to_owned()),
             LoadEvent::Joined(g) => Seen::Joined(g.id.as_str().to_owned()),
@@ -69,7 +71,7 @@ fn record(root: &SourceRoot) -> (Vec<Seen>, gearbox_engine::CatalogueScan) {
 fn a_streaming_consumer_ends_with_every_plugin_joined() {
     // **What the Studio actually receives**, which is not the returned scan. It
     // keeps the last copy of each gear it is sent, and a plugin is projected
-    // before its host may have been: `fills` names only a spec, and the point
+    // before its host may have been: `implements` names only a spec, and the point
     // is the host's declaration. The first conformance run after roles became
     // declared showed oidc-authn-plugin as "no described host declares it" --
     // true of the copy sent during projection, false of the catalogue.
@@ -100,12 +102,12 @@ fn a_streaming_consumer_ends_with_every_plugin_joined() {
         "every Joined comes after the last Projected"
     );
     let plugins: Vec<&gearbox_ir::GearDescriptor> =
-        last.values().filter(|g| g.fills.is_some()).collect();
+        last.values().filter(|g| g.implements.is_some()).collect();
     assert!(!plugins.is_empty(), "the corpus has plugins");
     for plugin in plugins {
         assert!(
             plugin
-                .fills
+                .implements
                 .as_ref()
                 .and_then(|f| f.point.as_ref())
                 .is_some(),
@@ -338,13 +340,14 @@ fn stopping_midway_through_projection_keeps_what_is_done() {
         "the gears not reached are still pending, not lost"
     );
     // The invariant, not the number: nothing discovered is lost on a stop. The
-    // total is the corpus's description count -- forty-four since the
-    // implemented gears were described -- and it is written out rather than
-    // read from the scan so that a gear vanishing between discovery and
-    // projection cannot satisfy both sides of the equation at once.
+    // total is the corpus's description count -- fifty-nine: forty-nine gears
+    // with code and ten designs -- and it is
+    // written out rather than read from the scan so that a gear vanishing
+    // between discovery and projection cannot satisfy both sides of the
+    // equation at once. Designs complete in the first pass, before the stop.
     assert_eq!(
-        scan.catalogue.gears.len() + scan.pending.len(),
-        44,
-        "every discovered gear is either projected or pending"
+        scan.catalogue.gears.len() + scan.pending.len() + scan.catalogue.designs.len(),
+        59,
+        "every discovered description is projected, pending or a design"
     );
 }

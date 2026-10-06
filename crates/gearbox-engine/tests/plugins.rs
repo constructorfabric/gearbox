@@ -372,7 +372,7 @@ fn a_plugin_under_the_wrong_host_is_an_error_naming_both() {
     );
 }
 
-/// Host declares *some* points, just not the one this plugin fills.
+/// Host declares *some* points, just not the one this plugin implements.
 ///
 /// The empty-host branch (`declares no extension point`) is covered above;
 /// this is the other formatting arm -- naming what the host *does* declare.
@@ -481,7 +481,7 @@ fn gear_rs(id: &str, extra: &str) -> String {
 
 fn gear_gdl(crate_name: &str, lib: &str, body: &str) -> String {
     format!(
-        "gear(\n    name = \"{crate_name}\",\n    description = \"d\",\n    category = \"core-functionality\",\n    visibility = \"internal\",\n    package = cargo(crate_name = \"{crate_name}\", lib = \"{lib}\", path = \".\"),\n{body}\n)\n"
+        "gear(\n    maturity = \"stable\",\n    name = \"{crate_name}\",\n    description = \"d\",\n    category = \"core-functionality\",\n    visibility = \"internal\",\n    package = cargo(crate_name = \"{crate_name}\", lib = \"{lib}\", path = \".\"),\n{body}\n)\n"
     )
 }
 
@@ -512,7 +512,7 @@ fn family(plugins: &[(&str, &str, &str)]) -> Vec<(&'static str, String)> {
             ),
         ),
     ];
-    for (dir, fills, body) in plugins {
+    for (dir, implements, body) in plugins {
         let leaked: &'static str = Box::leak(format!("{dir}/Cargo.toml").into_boxed_str());
         files.push((leaked, manifest(dir, &dir.replace('-', "_"))));
         let leaked: &'static str = Box::leak(format!("{dir}/src/lib.rs").into_boxed_str());
@@ -523,7 +523,7 @@ fn family(plugins: &[(&str, &str, &str)]) -> Vec<(&'static str, String)> {
             gear_gdl(
                 dir,
                 &dir.replace('-', "_"),
-                &format!("    fills = \"{fills}\","),
+                &format!("    implements = \"{implements}\","),
             ),
         ));
     }
@@ -556,7 +556,7 @@ fn a_declared_plugin_joins_its_host() {
     assert_eq!(host.extension_points[0].trait_ident, "ThingPluginClient");
 
     let plug = &catalogue.gears[&gearbox_ir::GearId::new("plug").unwrap()];
-    let fill = plug.fills.as_ref().expect("a plugin");
+    let fill = plug.implements.as_ref().expect("a plugin");
     assert_eq!(fill.point.as_ref(), Some(&host.extension_points[0]));
     assert!(plug.extension_points.is_empty());
     assert!(
@@ -580,7 +580,7 @@ fn a_host_that_implements_its_own_trait_is_still_a_host() {
     ));
     let catalogue = Root::new("proxy", &files).load();
     let host = &catalogue.gears[&gearbox_ir::GearId::new("host").unwrap()];
-    assert!(host.fills.is_none());
+    assert!(host.implements.is_none());
     assert_eq!(host.extension_points.len(), 1);
     assert_eq!(host.gts_types.len(), 1, "and its spec is its own");
 }
@@ -658,7 +658,10 @@ fn a_plugin_filling_a_spec_nobody_declares_is_gbx0519() {
         catalogue.diagnostics
     );
     let stray = &catalogue.gears[&gearbox_ir::GearId::new("stray").unwrap()];
-    assert_eq!(stray.fills.as_ref().and_then(|f| f.point.as_ref()), None);
+    assert_eq!(
+        stray.implements.as_ref().and_then(|f| f.point.as_ref()),
+        None
+    );
 }
 
 #[test]
@@ -672,7 +675,10 @@ fn a_plugin_implementing_nothing_of_its_point_warns_and_still_fills() {
     assert_eq!(found.severity, gearbox_ir::Severity::Warning);
     let lazy = &catalogue.gears[&gearbox_ir::GearId::new("lazy").unwrap()];
     assert!(
-        lazy.fills.as_ref().and_then(|f| f.point.as_ref()).is_some(),
+        lazy.implements
+            .as_ref()
+            .and_then(|f| f.point.as_ref())
+            .is_some(),
         "the declaration is the role; the impl is only evidence"
     );
 }
@@ -706,7 +712,7 @@ fn two_points_over_one_trait_stay_distinct() {
 
     let source = &catalogue.gears[&gearbox_ir::GearId::new("source").unwrap()];
     let point = source
-        .fills
+        .implements
         .as_ref()
         .and_then(|f| f.point.as_ref())
         .expect("joined");
@@ -753,7 +759,7 @@ fn plugin_interface_is_gone() {
 /// **The check used to be `validate`-only**, and nothing a person building the
 /// product uses validates: the Studio and `generate` both resolve. Measured in
 /// the Studio -- "errors 0" beside a description `validate` refused, and a tree
-/// generated for it. A plugin scoped to `prod` fills the point there and leaves
+/// generated for it. A plugin scoped to `prod` implements the point there and leaves
 /// `dev` empty, which is the case that shows the check is per profile rather
 /// than a copy of `validate`'s all-profiles answer.
 #[test]
@@ -795,5 +801,46 @@ fn a_resolution_reports_an_unfilled_point_for_its_own_profile() {
     assert!(
         unfilled("prod").is_empty(),
         "prod links oidc-authn-plugin, and dev's gap is not prod's to report"
+    );
+}
+
+const AM: &str = r#"use_gear("account-management", source = "gears-rust""#;
+
+#[test]
+fn a_host_is_matched_by_the_vendor_field_its_point_names() {
+    // account-management has two `vendor` fields: `tr_plugin.vendor`
+    // ("constructorfabric"), what it registers under as a tenant-resolver
+    // plugin, and `idp.vendor` ("cf"), what it selects its IdP plugin by. The
+    // first was read as the selector, so every product with the host failed
+    // GBX0512 against `static-idp-plugin` (vendor "cf") -- which the runtime
+    // finds. Its point now says `selector = "idp.vendor"`.
+    let cat = require!();
+    let am = cat.gear(&gearbox_ir::GearId::new("account-management").unwrap()).unwrap();
+    assert_eq!(am.vendor_selector.as_deref(), Some("cf"));
+
+    let (codes, messages) = check(
+        &cat,
+        &product(
+            r#"embedded(id = "dev")"#,
+            "dev",
+            &format!(r#"{AM}, plugins = [plugin("static-idp-plugin")])"#),
+        ),
+    );
+    assert!(codes.is_empty(), "{codes:?} {messages}");
+
+    // And the product overrides it at the same path, not at a top-level `vendor`.
+    let (codes, messages) = check(
+        &cat,
+        &product(
+            r#"embedded(id = "dev")"#,
+            "dev",
+            &format!(
+                r#"{AM}, config = {{"idp": {{"vendor": "keycloak"}}}}, plugins = [plugin("static-idp-plugin")])"#
+            ),
+        ),
+    );
+    assert!(
+        codes.contains(&DiagnosticCode::PluginVendorMismatch) && messages.contains("keycloak"),
+        "{codes:?} {messages}"
     );
 }

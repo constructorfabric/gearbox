@@ -39,15 +39,16 @@ pub const CLUSTER_CAP: GdlNamespace =
 
 /// The gear categories the platform actually uses.
 ///
-/// Taken from the `gear.toml` files the platform team committed, one per gear:
+/// Taken from the `gear.toml` files the platform team committed, one per gear,
+/// before they were retired into `gear.gdl` (ADR-0002 amendment, 2026-10-02):
 /// those seven values and no others. Not a `GdlNamespace` like the closed sets
 /// above, because `category` is a plain string in the description and this list
 /// drives a **warning**, not a refusal -- the taxonomy is visibly still
 /// settling, with `cluster` filed under `serverless` and `account-management`
 /// under `oss`.
 ///
-/// `example` is Gearbox's own addition. No `gear.toml` exists anywhere under
-/// `examples/`, so the platform's list has no slot for an example gear; if the
+/// `example` is Gearbox's own addition. No `gear.toml` ever existed under
+/// `examples/`, so the platform's list had no slot for an example gear; if the
 /// team adds one, rename to match rather than keeping both.
 pub const KNOWN_CATEGORIES: &[&str] = &[
     "api-ingress",

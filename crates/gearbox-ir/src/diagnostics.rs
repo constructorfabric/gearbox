@@ -718,7 +718,7 @@ diagnostic_codes! {
     /// gRPC.
     ///
     /// The corpus makes this reachable rather than theoretical: `cluster` and
-    /// `gear-orchestrator` both declare `grpc` and neither declares `deps`, so
+    /// `service-discovery` both declare `grpc` and neither declares `deps`, so
     /// nothing drags a hub in beside them.
     TopologyGrpcWithoutHub = "GBX0314", Topology, Error, true, "gRPC gears with no gRPC hub",
         prevents = Prevents::error("cf-gears-toolkit", "RegistryError", "GrpcRequiresHub");
@@ -841,6 +841,28 @@ diagnostic_codes! {
     /// corruption, and only the gear can say which it is
     /// (ADR `cpt-gearbox-adr-one-per-installation`).
     TopologyDuplicateRegistration = "GBX0320", Topology, Warning, false, "two applications register the same directory name";
+
+    /// A product selects a gear that is described but has no code yet.
+    ///
+    /// `maturity = "design"` in its `gear.gdl`: the catalogue knows the gear's
+    /// id, purpose and documents, and there is no crate to link. Distinct from
+    /// GBX0301 because "not in the catalogue" sends the reader looking for a
+    /// typo or a closed source root, and neither is the problem.
+    TopologyDesignGear = "GBX0321", Topology, Error, false, "gear is at design maturity";
+
+    /// A product links a gear its description calls `experimental`: its API
+    /// and behaviour may change freely. A warning, because using one is a
+    /// choice a product may make on purpose -- but it should be a choice.
+    TopologyExperimentalGear = "GBX0322", Topology, Warning, false, "gear is experimental";
+
+    /// A product links a gear at `preview`: usable, not declared stable.
+    /// Information, not a warning: most of the platform is here today, and a
+    /// warning on every product would be noise that hides GBX0322 and GBX0324.
+    TopologyPreviewGear = "GBX0323", Topology, Info, false, "gear is at preview";
+
+    /// A product links a gear its description calls `deprecated`: still
+    /// available, not for new products.
+    TopologyDeprecatedGear = "GBX0324", Topology, Warning, false, "gear is deprecated";
 
     // ---------------------------------------------------------------- GBX04xx
     /// This consumer and provider could be placed in separate processes, but the
@@ -1076,14 +1098,14 @@ diagnostic_codes! {
     /// Found by a UX pass rather than by a resolution, which is the useful part:
     /// the Add Gear panel offered the choice because nothing refused it, and a
     /// client is not a boundary (`cpt-gearbox-fr-rpc-writes-opt-in`).
-    PluginPointNotDeclared = "GBX0518", Cluster, Error, false, "plugin fills a point its host does not declare";
+    PluginPointNotDeclared = "GBX0518", Cluster, Error, false, "plugin implements a point its host does not declare";
 
-    /// A plugin fills a spec no described gear declares as an extension point.
+    /// A plugin implements a spec no described gear declares as an extension point.
     ///
     /// The plugin names only the spec; which trait and which SDK are the host's
     /// to say. With no host describing it, the fill has nothing to join to, so
     /// it is reported rather than left to look connected.
-    PluginSpecUndeclared = "GBX0519", Cluster, Error, false, "plugin fills a point no described gear declares";
+    PluginSpecUndeclared = "GBX0519", Cluster, Error, false, "plugin implements a point no described gear declares";
 
     /// A cluster backend decides a capability at run time, so none is claimed
     /// for it at composition time.
@@ -1158,12 +1180,12 @@ diagnostic_codes! {
     /// whole point: the feature is selected two lines away, in the same file.
     ClusterProviderNeedsFeature = "GBX0525", Cluster, Error, true, "a cluster provider is not in this build";
 
-    /// A gear declares it fills a point, and its crate implements none of that
+    /// A gear declares it implements a point, and its crate implements none of that
     /// point's trait.
     ///
     /// A warning, because the implementation is evidence and not the source of
     /// the role: an impl can sit in a generic wrapper or a macro this reader
-    /// cannot see. But the ordinary cause is a `fills` naming the wrong spec,
+    /// cannot see. But the ordinary cause is an `implements` naming the wrong spec,
     /// and that one is worth a line.
     PluginImplMissing = "GBX0526", Cluster, Warning, false, "a plugin implements none of its point's trait";
 

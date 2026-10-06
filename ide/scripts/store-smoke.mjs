@@ -644,7 +644,7 @@ const PLACE = { gearId: "ldap-authn-plugin", sourceId: "gears", at: "gears", isP
   const placed = placeNewGear({ ...PLACE, isPlugin: true }, "Payments Demo");
   check(placed.ok === false, "a plugin with no host cannot be placed at all");
   check(
-    placed.reason.includes("goes inside the gear it fills"),
+    placed.reason.includes("goes inside the gear it implements a point of"),
     "and the refusal says where a plugin goes",
   );
 }
@@ -884,7 +884,7 @@ const PLACE = { gearId: "ldap-authn-plugin", sourceId: "gears", at: "gears", isP
     `the path climbs out of the gear's own folder (got ${ready.scaffold?.path})`,
   );
   // `plugin_interface` is retired (ADR-0002, 2026-09-24): what makes the gear a
-  // plugin is `fills`, the spec of the point chosen, and the trait rides beside
+  // plugin is `implements`, the spec of the point chosen, and the trait rides beside
   // it only to name the dependency in a comment.
   check(
     ready.scaffold?.spec === "cf.core.authn_resolver.plugin.v1~" &&

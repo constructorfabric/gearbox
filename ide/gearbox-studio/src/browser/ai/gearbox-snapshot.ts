@@ -250,6 +250,11 @@ export interface GearListEntry {
   /** Pending rows have no `GearId` yet (ADR-0009), so they are named by key. */
   readonly pending: boolean;
   /**
+   * Described at design maturity: no crate, so not a gear to add. Present
+   * only when true, so the common entry stays as short as it was.
+   */
+  readonly design?: true;
+  /**
    * Named as a top-level gear by the description.
    *
    * Spelled the same as `gearbox_get_gear`'s field on purpose: a plugin is
@@ -275,6 +280,7 @@ export function gearList(
         name: rowName(row),
         category: rowCategory(row),
         pending,
+        ...(row.kind === "design" ? { design: true as const } : {}),
         selectedDirectly: !pending && inProduct(id),
       };
     })

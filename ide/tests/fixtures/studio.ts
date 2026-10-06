@@ -216,12 +216,19 @@ async function open(
       return page.evaluate(async (wanted) => {
         // The detail widget renders on the store's change event, so poll for the
         // gear's own name to appear rather than sleeping a guessed interval.
+        //
+        // **Scoped to the Inspector.** The Composition pane renders a
+        // `.gbx-detail` too, and once a claim earlier in the run had opened
+        // the product with API Gateway in it, an unscoped query read that
+        // pane's settings form -- which also says "API Gateway" -- instead
+        // of the catalogue facts the claim is about.
         for (let attempt = 0; attempt < 60; attempt += 1) {
-          const text = document.querySelector(".gbx-detail")?.textContent ?? "";
+          const text =
+            document.querySelector(".gbx-widget-inspector .gbx-detail")?.textContent ?? "";
           if (text.includes(wanted)) return text.replace(/\s+/g, " ").trim();
           await new Promise((r) => setTimeout(r, 50));
         }
-        return (document.querySelector(".gbx-detail")?.textContent ?? "")
+        return (document.querySelector(".gbx-widget-inspector .gbx-detail")?.textContent ?? "")
           .replace(/\s+/g, " ")
           .trim();
       }, name);
@@ -231,7 +238,7 @@ async function open(
       if (found === null) return null;
       return page.evaluate(() => {
         const out: Record<string, { text: string; codes: string[] }> = {};
-        for (const row of Array.from(document.querySelectorAll(".gbx-detail .gbx-kv"))) {
+        for (const row of Array.from(document.querySelectorAll(".gbx-widget-inspector .gbx-detail .gbx-kv"))) {
           const spans = row.children;
           const label = (spans[0]?.textContent ?? "").trim();
           const value = spans[1];

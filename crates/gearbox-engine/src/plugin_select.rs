@@ -1,7 +1,7 @@
 //! Resolving which plugin implementation a host gets, per deployment profile.
 //!
 //! This is the half that needs both halves: the catalogue says which extension
-//! points exist and what each plugin fills, the product says which
+//! points exist and what each plugin implements, the product says which
 //! implementations are linked and how they are configured. Neither alone can
 //! answer "will this host find a plugin".
 //!
@@ -91,19 +91,33 @@ fn report_plugin_config_types(intent: &ProductIntent, uri: &str, diagnostics: &m
 }
 
 /// The vendor a host will search for.
+///
+/// Read from the product's config for the host at the key its extension point
+/// names -- `idp.vendor` is `config = {"idp": {"vendor": ...}}` -- or the
+/// top-level `vendor` when none is named. The default comes from the same
+/// field, projected into `vendor_selector`.
 fn host_vendor<'a>(gear: &'a GearDescriptor, intent: &'a ProductIntent) -> Option<&'a str> {
+    let key = gear
+        .extension_points
+        .iter()
+        .find_map(|p| p.selector.as_deref())
+        .unwrap_or("vendor");
     intent
         .selected_gears
         .iter()
         .find(|s| s.gear == gear.id)
-        .and_then(|s| s.config.get("vendor"))
+        .and_then(|s| {
+            let mut segments = key.split('.');
+            let first = s.config.get(segments.next()?)?;
+            segments.try_fold(first, |value, segment| value.get(segment))
+        })
         .and_then(serde_json::Value::as_str)
         .or(gear.vendor_selector.as_deref())
 }
 
 /// The vendor a plugin registers itself under with nothing configured.
 fn default_vendor(gear: &GearDescriptor) -> Option<&str> {
-    gear.fills
+    gear.implements
         .as_ref()
         .and_then(|f| f.default_vendor.as_deref())
 }
@@ -140,7 +154,7 @@ fn plugin_priority(selection: &PluginSelection, catalogue: &Catalogue) -> i64 {
         .or_else(|| {
             catalogue
                 .gear(&selection.gear)
-                .and_then(|g| g.fills.as_ref())
+                .and_then(|g| g.implements.as_ref())
                 .and_then(|f| f.default_priority)
         })
         .unwrap_or(i64::MAX)
@@ -149,7 +163,7 @@ fn plugin_priority(selection: &PluginSelection, catalogue: &Catalogue) -> i64 {
 /// Check every selected host's extension points, in every profile.
 ///
 /// Per profile rather than once: the canonical product runs a static plugin in
-/// dev and a real one in prod, so "is this point filled" only has an answer once
+/// dev and a real one in prod, so "is this point implemented" only has an answer once
 /// a profile is fixed.
 pub fn check(
     catalogue: &Catalogue,
@@ -242,13 +256,16 @@ fn report_misplaced_plugins(
             continue;
         };
         for plugin in &selection.plugins {
-            let Some(fills) = catalogue.gear(&plugin.gear).and_then(|g| g.fills.as_ref()) else {
+            let Some(implements) = catalogue
+                .gear(&plugin.gear)
+                .and_then(|g| g.implements.as_ref())
+            else {
                 // Not a plugin at all, or absent from the catalogue. Both are
                 // other codes' business (GBX0301, GBX0516), and naming them here
                 // would report one fault twice.
                 continue;
             };
-            if host.declares_point(&fills.spec) {
+            if host.declares_point(&implements.spec) {
                 continue;
             }
             let declares = if host.extension_points.is_empty() {
@@ -267,16 +284,16 @@ fn report_misplaced_plugins(
                 Diagnostic::error(
                     DiagnosticCode::PluginPointNotDeclared,
                     format!(
-                        "gear `{}` lists plugin `{}`, which fills `{}`, but `{}` {declares}",
+                        "gear `{}` lists plugin `{}`, which implements `{}`, but `{}` {declares}",
                         selection.gear,
                         plugin.gear,
-                        fills.describe(),
+                        implements.describe(),
                         selection.gear
                     ),
                     format!(
                         "list `{}` under the gear that declares `{}`, or drop it",
                         plugin.gear,
-                        fills.describe()
+                        implements.describe()
                     ),
                 )
                 .at(gearbox_ir::Location::or_file(
@@ -310,7 +327,7 @@ fn resolve_point(
         .filter(|p| {
             catalogue
                 .gear(&p.gear)
-                .and_then(|g| g.fills.as_ref())
+                .and_then(|g| g.implements.as_ref())
                 .is_some_and(|f| f.spec == point.spec)
         })
         .collect();
@@ -457,16 +474,16 @@ fn report_orphan_plugins(
     diagnostics: &mut Diagnostics,
 ) {
     for selection in &intent.selected_gears {
-        let Some(fills) = catalogue
+        let Some(implements) = catalogue
             .gear(&selection.gear)
-            .and_then(|g| g.fills.as_ref())
+            .and_then(|g| g.implements.as_ref())
         else {
             continue;
         };
         let has_host = intent.selected_gears.iter().any(|other| {
             catalogue
                 .gear(&other.gear)
-                .is_some_and(|g| g.declares_point(&fills.spec))
+                .is_some_and(|g| g.declares_point(&implements.spec))
         });
         if !has_host {
             diagnostics.push(
@@ -476,7 +493,7 @@ fn report_orphan_plugins(
                         "gear `{}` implements extension point `{}`, but no selected gear \
                          expects it",
                         selection.gear,
-                        fills.describe()
+                        implements.describe()
                     ),
                     "select the host gear and list this one under its `plugins = [...]`, or \
                      drop it",

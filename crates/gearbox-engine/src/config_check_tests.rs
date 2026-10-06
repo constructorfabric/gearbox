@@ -54,6 +54,7 @@ fn catalogue() -> Catalogue {
 
 fn demo_descriptor() -> GearDescriptor {
     GearDescriptor {
+        maturity: gearbox_ir::Maturity::Stable,
         one_per_installation: false,
         id: GearId::new("demo").unwrap(),
         display_name: "Demo".to_owned(),
@@ -80,7 +81,7 @@ fn demo_descriptor() -> GearDescriptor {
         client_trait: None,
         cluster_providers: Vec::new(),
         extension_points: Vec::new(),
-        fills: None,
+        implements: None,
         vendor_selector: None,
         declared_roles: Vec::new(),
         available_features: BTreeSet::new(),

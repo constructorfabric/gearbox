@@ -73,6 +73,7 @@ fn source(declared: &str) -> String {
     format!(
         r#"
 gear(
+    maturity = "stable",
     name = "Demo",
     description = "d",
     category = "core-functionality",

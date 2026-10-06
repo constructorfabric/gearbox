@@ -341,11 +341,11 @@ fn directory_discovery_without_the_grpc_hub_is_refused() {
     // of reporting anything.
     let cat = support::catalogue_of(vec![
         support::gear_with_caps("host", &[], &[]),
-        support::gear_with_caps("gear-orchestrator", &[], &[]),
+        support::gear_with_caps("service-discovery", &[], &[]),
         support::gear_with_caps("moved", &[], &[]),
     ]);
     let mut intent = support::self_hosted(
-        &["host", "gear-orchestrator", "moved"],
+        &["host", "service-discovery", "moved"],
         Discovery::Directory,
         Some("target"),
     );

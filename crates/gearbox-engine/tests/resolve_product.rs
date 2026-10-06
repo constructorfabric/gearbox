@@ -183,7 +183,7 @@ fn every_gear_records_why_it_is_in_the_product() {
 fn a_named_gear_is_explained_by_the_description_and_not_by_the_profile() {
     // The gap that let a false sentence reach a person. Nothing asserted what
     // a `Selected` edge points *at*, so it pointed at the profile and the
-    // panel read "gear-orchestrator -- selected-by -- dev" about a
+    // panel read "service-discovery -- selected-by -- dev" about a
     // `gears = [...]` list that is not profile-scoped: the identical edge was
     // emitted for `local` and `prod` too.
     let cat = support::catalogue_of(vec![support::gear_with_caps("api", &[], &[])]);

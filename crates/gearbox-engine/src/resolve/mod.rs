@@ -115,6 +115,14 @@ pub fn resolve_at(
 
     // Step 2 -- the co-location closure.
     let closure = closure::expand(catalogue, intent, profile, &uri, &mut diagnostics);
+    // What the product links below `stable` -- known now, for every member.
+    closure::maturity_diagnostics(
+        catalogue,
+        closure.members.iter().map(|(g, r)| (g, r.as_slice())),
+        intent,
+        &uri,
+        &mut diagnostics,
+    );
 
     // Step 3 -- which edges could carry a boundary.
     let cuts = cuts::classify(catalogue, &closure, &uri, &mut diagnostics);

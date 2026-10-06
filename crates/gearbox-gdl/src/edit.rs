@@ -102,7 +102,7 @@ pub fn add_gear(uri: &str, source: &str, gear: &str, source_id: &str) -> Result<
 /// produces a file that parses, saves, and then refuses to load -- and the
 /// refusal names the description rather than the edit that put it there. That is
 /// how a scaffolded product ended up with `sources = [source(id = "source-1")]`
-/// and `use_gear("gear-orchestrator", source = "gears-rust")` in the same file.
+/// and `use_gear("service-discovery", source = "gears-rust")` in the same file.
 ///
 /// Silent when the product has no `sources` list to read. Absent is not the same
 /// answer as empty, and a description that declares none is the loader's

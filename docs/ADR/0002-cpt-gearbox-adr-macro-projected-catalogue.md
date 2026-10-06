@@ -304,7 +304,8 @@ Grounding, all re-checkable in `gears-rust`:
   six keys, of which `client` and `ctor` are Rust paths and expressions. See
   `gears/chat-engine/chat-engine/src/module.rs:109-116` for the fullest example in the repository.
 * The `gear.toml` that vision §8 shows as the thing being replaced does not exist:
-  `find . -name gear.toml` returns zero hits.
+  `find . -name gear.toml` returns zero hits. (True when written. The platform added 41 later, read
+  by nothing; Amendment 2026-10-02 retires them into `gear.gdl`.)
 * `#[toolkit::consumes]` appears in 17 files against 39 gears, which is why undeclared edges must
   stay uncuttable.
 
@@ -583,7 +584,9 @@ wrong. With one gap, recorded rather than guessed around: the host's selector is
 first config type with a `vendor` default, and a host whose selector is another field reads wrong
 or not at all. account-management reads `tr_plugin.vendor` for its IdP point (its selector is
 `idp.vendor`); bss-rate-provider and bss-ledger read none. The fix is for `extension_point` to
-name its selector field, and it is not in this change.
+name its selector field, and it is not in this change. (Done 2026-10-05:
+`extension_point(selector = "idp.vendor")`. Reported on gears-rust PR #4793 as GBX0512 on every
+product using account-management.)
 
 ### What this retires
 
@@ -602,3 +605,70 @@ vendor/GTS pattern, and the spec is its key.
   `plugin_interface` refused.
 * `crates/gearbox-project/src/plugin_tests.rs` -- the readers: public traits whatever their name,
   test code excluded, and a crate with several gears split by its attributes' directories.
+
+## Amendment 2026-10-02: `gear.toml` is retired, `fills` is `implements`, and a gear can be a design
+
+Three changes, made together because the first needed the other two.
+
+### `gear.toml` is folded into `gear.gdl`
+
+The platform added 41 `gear.toml` files, all one shape -- `[gear]` with `name`, `description`,
+`category`, `is_plugin`, `has_plugins`, `has_extension_point` -- in one commit "for catalog
+discovery". **Nothing reads them**: no code, build script, macro, CI workflow or script in
+`gears-rust`, and not Gearbox. So retiring them moves data and changes no consumer:
+
+| `gear.toml` | Where it went |
+|---|---|
+| `name`, `description`, `category` | the same fields of `gear(...)`; where the two disagreed, chosen per gear with the owners' review |
+| `is_plugin` | follows from `implements` |
+| `has_extension_point` | follows from `extension_points` |
+| `has_plugins` | follows from which gears implement those points -- a catalogue question |
+
+The flags are not carried, because each restates something the description already declares, and
+measured against the catalogue 12 of the 41 disagreed with it -- `tenant-resolver` and
+`bss/ledger` declare points their flags deny, `types-registry`, `resource-group`, `pricing`,
+`event-broker`, `oagw` and `chat-engine` claim points nothing declares. (`cluster`'s
+`has_plugins` is not counted: it means its backend crates, which are `cluster_plugins`, not
+extension-point plugins.) That is the same
+"quietly wrong" finding ADR-0009 made of `has_extension_point`, at a larger sample.
+
+### `fills` is `implements`
+
+The keyword that makes a gear a plugin read as a verb about data. A plugin *implements* its
+host's extension point -- the word eCos CDL uses for the same role. Renamed without an alias:
+`fills = ...` fails evaluation with a message that says what to write instead. The IR's
+`PluginFill` is `PluginImpl`. This amendment's predecessor (2026-09-24) keeps the old word as
+history.
+
+### `maturity = "design"`
+
+Fourteen `gear.toml` files had no `gear.gdl`, and only one of them -- `settings-service` -- had a
+crate to describe. The other thirteen are documents and, for two, an SDK published ahead of the
+gear. Dropping their metadata would lose the only catalogue entry those gears have, so a gear can
+now be described before it has code:
+
+* `gear(maturity = "design", id = ..., name?, description?, category?, sdk?, docs?)`. The id is
+  declared because there is no attribute to project it from; on a stable gear it stays GBX0210.
+  Anything that describes code is refused.
+* The catalogue keeps these in `Catalogue.designs`, apart from `gears`, so the resolver and the
+  generator never meet one. Naming one in `use_gear(...)` is **GBX0321**, not "unknown gear".
+* A design id that also has a gear with code is GBX0105: the design has been outgrown.
+
+The decision this amends is untouched: nothing projected is restated, and a design gear has
+nothing to project.
+
+**Revised the same week: `maturity` is required, with five levels.** The first cut had two values
+and defaulted to `stable`. That default is the dangerous one -- a description that forgot the
+field became a promise of stability nobody made -- so the field has no default, and a gear with
+code says which of `experimental`, `preview`, `stable` or `deprecated` it is. A product hears
+about what it links below `stable`: GBX0322 (experimental, warning), GBX0323 (preview, info),
+GBX0324 (deprecated, warning), for every gear in the closure, chosen or not. The platform's gears
+start at `preview`: nobody has declared any of them stable, and saying so for them would be the
+same unearned promise. A second axis for how much code exists (`implementation = none | sdk |
+partial | full`) was considered and not taken; `design` plus `sdk` covers the one case seen.
+
+### Traceability
+
+* `crates/gearbox-gdl/src/globals.rs` -- `maturity`, the design-gear refusals, the `fills` hint.
+* `crates/gearbox-engine/src/catalogue.rs::design_gear`; `resolve/closure.rs::at_design`.
+* `crates/gearbox-engine/tests/design.rs`; `crates/gearbox-gdl/tests/eval_declared.rs`.

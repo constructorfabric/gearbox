@@ -1303,7 +1303,7 @@ fn a_source_the_product_does_not_declare_is_refused() {
     // while the catalogue called the same root `gears-rust`, so Add Gear wrote
     // an id nothing declared -- a file that saved and then would not load, with
     // the refusal naming the description rather than this edit.
-    let refusal = add_gear(URI, WITH_SOURCES, "gear-orchestrator", "source-1")
+    let refusal = add_gear(URI, WITH_SOURCES, "service-discovery", "source-1")
         .expect_err("an undeclared source is refused");
     let first = refusal.iter().next().expect("one diagnostic");
     assert_eq!(first.code, DiagnosticCode::GdlEval);
@@ -1318,13 +1318,13 @@ fn a_source_the_product_does_not_declare_is_refused() {
 fn a_declared_source_is_accepted() {
     // The other half, and the one that says the check is not simply a refusal
     // of everything: the same product, the id it actually declares.
-    let edited = add_gear(URI, WITH_SOURCES, "gear-orchestrator", "gears-rust")
+    let edited = add_gear(URI, WITH_SOURCES, "service-discovery", "gears-rust")
         .expect("editable")
         .changed()
         .expect("changed")
         .to_owned();
     assert!(
-        edited.contains(r#"use_gear("gear-orchestrator", source = "gears-rust")"#),
+        edited.contains(r#"use_gear("service-discovery", source = "gears-rust")"#),
         "{edited}"
     );
 }

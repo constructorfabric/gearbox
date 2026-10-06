@@ -1984,7 +1984,7 @@ fn scaffold_gear(state: &mut State, id: RequestId, params: &ScaffoldGearParams) 
         return error(
             id,
             error_code::EDIT_REFUSED,
-            "`plugin` describes what a plugin fills, so it only applies to `kind = \"plugin\"`",
+            "`plugin` describes what a plugin implements, so it only applies to `kind = \"plugin\"`",
         );
     }
 
@@ -2152,6 +2152,9 @@ fn scaffold_gear_files(
 
 gear(
     name = {name},
+    # New code makes no promise yet. Raise it -- preview, then stable -- when
+    # the gear has earned it; there is no default because `stable` would be one.
+    maturity = "experimental",
     package = cargo(
         crate_name = {crate_quoted},
         lib = {lib_quoted},
@@ -2225,7 +2228,7 @@ fn rel_path(path: &str) -> Result<RelPath, String> {
 /// **Comments, not values, and that is the whole design.** Every one of these
 /// fields is either projected from Rust or checked against it: a `category` this
 /// method invented would draw GBX's unknown-category warning on the first load, a
-/// `fills` naming a spec no described gear declares is refused (GBX0519), and an
+/// `implements` naming a spec no described gear declares is refused (GBX0519), and an
 /// `sdk` locator pointing at a directory that does not exist makes the gear fail
 /// to load. So the shape's job is to put the next declaration **where it goes**,
 /// with the sentence that says what decides it -- and to leave it commented until
@@ -2235,7 +2238,7 @@ fn gdl_shape(
     kind: crate::protocol::GearKind,
     plugin: Option<&crate::protocol::PluginScaffold>,
 ) -> std::borrow::Cow<'static, str> {
-    // A host chosen from a loaded catalogue makes the spec a fact, so `fills` is
+    // A host chosen from a loaded catalogue makes the spec a fact, so `implements` is
     // written live rather than as the comment the rest of this function returns.
     // The comment exists because a spec nobody declares is GBX0519; one the
     // engine itself reported a host declaring is not.
@@ -2245,7 +2248,7 @@ fn gdl_shape(
     std::borrow::Cow::Borrowed(gdl_shape_commented(kind))
 }
 
-/// The live `fills`, and where the trait it implements comes from.
+/// The live `implements`, and where the trait it implements comes from.
 ///
 /// Rendered through `quote_string`, not `{:?}`: this text is evaluated as GDL
 /// immediately afterwards, and Rust's debug escaping is not Starlark's.
@@ -2265,7 +2268,7 @@ fn plugin_shape(plugin: &crate::protocol::PluginScaffold) -> String {
     # from `{crate_name}` (`lib = "{lib}"`, at `{path}`) -- the catalogue warns
     # (GBX0526) while nothing in this crate does. A plugin declares no `sdk`: the
     # host's SDK is the host's.
-    fills = {spec},
+    implements = {spec},
 
     # A plugin's own `vendor` and `priority` are the join key its host's selector
     # matches against, and both are read from this crate's config struct. What is
@@ -2337,7 +2340,7 @@ fn gdl_shape_commented(kind: crate::protocol::GearKind) -> &'static str {
     # config_schema = config(exposes = ["bind_addr"]),
 "#
         }
-        // A gear that fills another gear's extension point. `fills` is the
+        // A gear that implements another gear's extension point. `implements` is the
         // declaration that makes it one, and it stays commented until it names
         // a spec some described gear declares -- otherwise it is GBX0519.
         crate::protocol::GearKind::Plugin => {
@@ -2347,11 +2350,11 @@ fn gdl_shape_commented(kind: crate::protocol::GearKind) -> &'static str {
     # visibility = "internal",
 
     # **The declaration that makes this a plugin**: the GTS spec of the point it
-    # fills, as its host declares it in `extension_points`. A spec no described
+    # implements, as its host declares it in `extension_points`. A spec no described
     # gear declares is refused (GBX0519), so uncomment it once the host is known.
     # A plugin declares no `sdk` -- the host's SDK is the host's.
     #
-    # fills = "cf.core.authn_resolver.plugin.v1~",
+    # implements = "cf.core.authn_resolver.plugin.v1~",
 
     # A plugin's own `vendor` and `priority` are the join key its host's selector
     # matches against, and both are read from this crate's config struct. What is
@@ -2408,7 +2411,7 @@ fn lib_source(
                 trait_ident = comment_safe(&plugin.trait_ident),
             ),
             None => String::from(
-                "\n// Next: choose what this plugin fills -- set `fills` in gear.gdl, add the\n\
+                "\n// Next: choose the point this plugin implements -- set `implements` in gear.gdl, add the\n\
                  // crate that declares the point's trait to Cargo.toml, and implement it.\n",
             ),
         },
@@ -2461,7 +2464,7 @@ fn lib_stub(kind: crate::protocol::GearKind) -> String {
              //\n\
              // Next, in this order:\n\
              //   1. add the crate that declares the point's trait to Cargo.toml,\n\
-             //      and set `fills` in gear.gdl to the point's spec -- that is\n\
+             //      and set `implements` in gear.gdl to the point's spec -- that is\n\
              //      what makes this gear a plugin;\n\
              //   2. impl that trait; the catalogue warns (GBX0526) while no\n\
              //      impl of it exists here;\n\
@@ -3476,8 +3479,13 @@ fn catalogue_load(connection: &Connection, state: &mut State, id: RequestId) -> 
 
     let mut last_progress = std::time::Instant::now();
     let mut pending = Vec::new();
+    let mut designs = Vec::new();
     let mut total = 0_u32;
     let mut completed = 0_u32;
+    // Whether a progress line has gone out yet. Not `completed == 1`: design
+    // gears are counted during the first pass, so the first projection need
+    // not be the first completion.
+    let mut progressed = false;
     let mut answered = false;
     // How many diagnostics went out with the response, so the follow-up sends
     // the rest and not all of them again.
@@ -3490,6 +3498,13 @@ fn catalogue_load(connection: &Connection, state: &mut State, id: RequestId) -> 
                 total = u32::try_from(n).unwrap_or(u32::MAX);
             }
             LoadEvent::Declared(entry) => pending.push(entry.clone()),
+            // Counted as done: `total` counts every description, and a design
+            // one is complete when declared. Leaving it out held the bar short
+            // of its denominator for the whole load.
+            LoadEvent::Design(design) => {
+                completed += 1;
+                designs.push(design.clone());
+            }
             LoadEvent::DeclarationComplete { diagnostics, .. } => {
                 // The tree has its whole shape and none of its badges: answer.
                 // The declaration diagnostics go with it -- an evaluation
@@ -3499,6 +3514,7 @@ fn catalogue_load(connection: &Connection, state: &mut State, id: RequestId) -> 
                 let result = CatalogueLoadResult {
                     total,
                     pending: std::mem::take(&mut pending),
+                    designs: std::mem::take(&mut designs),
                     diagnostics: diagnostics.to_vec(),
                 };
                 // `answered` only when the send succeeded. Setting it
@@ -3547,7 +3563,8 @@ fn catalogue_load(connection: &Connection, state: &mut State, id: RequestId) -> 
                 // cannot render that often anyway. The first one goes out
                 // immediately so a bar appears at once, and `done: true` below is
                 // unconditional, which is the message a client waits on.
-                if completed == 1 || last_progress.elapsed() >= PROGRESS_STEP {
+                if !progressed || last_progress.elapsed() >= PROGRESS_STEP {
+                    progressed = true;
                     last_progress = std::time::Instant::now();
                     disconnected |= !notify(
                         connection,
@@ -3652,6 +3669,7 @@ fn catalogue_load(connection: &Connection, state: &mut State, id: RequestId) -> 
         &CatalogueLoadResult {
             total,
             pending: Vec::new(),
+            designs: Vec::new(),
             diagnostics,
         },
     ))

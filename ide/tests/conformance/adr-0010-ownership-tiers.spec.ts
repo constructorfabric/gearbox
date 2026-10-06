@@ -120,7 +120,7 @@ test.describe("what the tool may write", () => {
       // roots, so the catalogue projects the new gear at once (ADR-0013
       // amendment); a plugin's trait `impl` is still offered commented, because
       // writing it needs the SDK's trait read. And for a plugin the field that
-      // matters in the description -- `fills`, the
+      // matters in the description -- `implements`, the
       // declaration that makes it one -- is offered **commented**, because a
       // spec no described gear declares is refused (GBX0519), so a placeholder
       // would hand its author a description to repair rather than one to fill
@@ -188,7 +188,7 @@ test.describe("what the tool may write", () => {
       //
       // A host picked out of the loaded catalogue declares a spec the engine
       // itself reported, so there is nothing left to protect against and
-      // `fills` is written live. The preview shows the description's own text now, because the three
+      // `implements` is written live. The preview shows the description's own text now, because the three
       // file *paths* are identical for all three shapes.
       const { page } = freshStudio;
       await settled(page);
@@ -207,7 +207,7 @@ test.describe("what the tool may write", () => {
       // whose" is a real state to be in.
       await expect
         .poll(async () => (await gdl.textContent()) ?? "", { timeout: 30_000 })
-        .toContain("# fills = ");
+        .toContain("# implements = ");
       // **Asserted, not only asserted about.** The sentence above was the whole
       // claim for this state, and it checked the `gear.gdl` alone -- so the
       // difference between "the commented locator is the right answer" and "the
@@ -236,7 +236,7 @@ test.describe("what the tool may write", () => {
       // which the answer for `service` could arrive last and win.
       await expect
         .poll(async () => (await gdl.textContent()) ?? "", { timeout: 30_000 })
-        .toMatch(/^\s{4}fills = "[a-z0-9_.]+~"/m);
+        .toMatch(/^\s{4}implements = "[a-z0-9_.]+~"/m);
       expect(
         (await gdl.textContent()) ?? "",
         "the author is told which crate the trait comes from, by library identifier",

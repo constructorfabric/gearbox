@@ -187,6 +187,9 @@ gdl_record! {
         pub spec: String,
         pub trait_ident: String,
         pub sdk: Option<CargoRecord>,
+        /// The host's config key it selects a plugin by, as a dotted path --
+        /// `"idp.vendor"`. Absent means a top-level `vendor`.
+        pub selector: Option<String>,
         /// Where `extension_point(...)` was written.
         #[allocative(skip)]
         pub declared_at: Option<gearbox_ir::Location>,

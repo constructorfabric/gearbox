@@ -38,6 +38,32 @@
 .gbx-pending .gbx-row-name { opacity: 0.65; }
 .gbx-waiting { opacity: 0.45; font-style: italic; font-size: 0.9em; }
 
+/* A design gear is complete and not usable. Set apart by shape -- an outlined
+   badge and an italic name -- rather than by opacity, which is what the id
+   class below learned costs contrast. */
+.gbx-design-row .gbx-row-name { font-style: italic; }
+
+/* Maturity below stable: outlined like the design badge, so a filled badge
+   keeps meaning "a capability". Deprecated also strikes the name, because it
+   is the one level that says "do not pick this". */
+.gbx-badge.gbx-maturity {
+  background: transparent;
+  color: var(--theia-descriptionForeground);
+  border-color: var(--theia-descriptionForeground);
+}
+.gbx-badge.gbx-maturity-experimental,
+.gbx-badge.gbx-maturity-deprecated {
+  color: var(--theia-editorWarning-foreground);
+  border-color: var(--theia-editorWarning-foreground);
+}
+.gbx-deprecated-row .gbx-row-name { text-decoration: line-through; }
+.gbx-badge.gbx-design {
+  background: transparent;
+  color: var(--theia-descriptionForeground);
+  border-color: var(--theia-descriptionForeground);
+  border-style: dashed;
+}
+
 /* A technical id is secondary, not faint. `opacity: 0.55` at `0.85em` measured
    below 4.5:1 -- on the dark palette it was `#DCE6F4` over `#001838`, and the
    arithmetic is no kinder on the light one -- and this is the class that carries

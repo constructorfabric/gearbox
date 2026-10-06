@@ -143,7 +143,7 @@ fn logged(client: &Connection) -> String {
 /// It parses, so the evaluator is what rejects it, and the span it reports
 /// covers the whole `gear(...)` call -- a range with something in it, which is
 /// what "source ranges" in the requirement asks for.
-const MISTYPED_GEAR: &str = "gear(\n  name = 5,\n  category = \"example\",\n  \
+const MISTYPED_GEAR: &str = "gear(\n  maturity = \"stable\",\n  name = 5,\n  category = \"example\",\n  \
                              package = cargo(crate_name = \"demo\", lib = \"demo\", \
                              path = \".\"),\n)\n";
 
@@ -152,7 +152,7 @@ const MISTYPED_GEAR: &str = "gear(\n  name = 5,\n  category = \"example\",\n  \
 /// Its diagnostic is a *point*, not a span -- the place the expression should
 /// have continued. Kept as a fixture because it is what a half-typed file looks
 /// like, and because it is the case a "non-empty range" rule would wrongly drop.
-const TRUNCATED_GEAR: &str = "gear(\n  name = \"Demo\",\n";
+const TRUNCATED_GEAR: &str = "gear(\n  maturity = \"stable\",\n  name = \"Demo\",\n";
 
 /// A file with no `gear()` in it at all.
 ///
@@ -160,7 +160,7 @@ const TRUNCATED_GEAR: &str = "gear(\n  name = \"Demo\",\n";
 /// the file rather than a place in it, so it is the fixture for the rule.
 const EMPTY_GEAR: &str = "";
 
-const VALID_GEAR: &str = "gear(\n  name = \"Demo\",\n  category = \"example\",\n  \
+const VALID_GEAR: &str = "gear(\n  maturity = \"stable\",\n  name = \"Demo\",\n  category = \"example\",\n  \
                           package = cargo(crate_name = \"demo\", lib = \"demo\", path = \".\"),\n)\n";
 
 /// Opening a broken description underlines it, and underlines *something*.
@@ -435,7 +435,7 @@ fn a_percent_encoded_uri_names_the_same_file() {
 /// can say that has a different answer depending on which directory the server
 /// calls the root. That makes it the fixture for the `source_root` argument:
 /// nothing else about evaluating a single description depends on it.
-const ROOTED_GEAR: &str = "load(\"//shared.gdl\", \"SHARED\")\ngear(\n  name = \"Demo\",\n  \
+const ROOTED_GEAR: &str = "load(\"//shared.gdl\", \"SHARED\")\ngear(\n  maturity = \"stable\",\n  name = \"Demo\",\n  \
                            category = \"example\",\n  package = SHARED,\n)\n";
 
 /// A source root laid out on disk, with the shared fragment at its top.
@@ -851,6 +851,11 @@ fn completion_inside_an_unparseable_call_offers_its_parameters() {
         items.iter().all(|i| i.kind == lsp::COMPLETION_FIELD),
         "a parameter is a Field, not a Function: {items:?}"
     );
+    // Accepted only to be refused by name: offering them invites the mistake.
+    for refused in ["fills", "runtime_caps", "cluster_providers"] {
+        assert!(!labels.contains(&refused), "`{refused}` is offered: {labels:?}");
+    }
+    assert!(labels.contains(&"maturity"), "the required field is offered: {labels:?}");
 }
 
 /// At the top of a file, the constructs that file kind admits.

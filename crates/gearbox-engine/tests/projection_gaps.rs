@@ -32,6 +32,7 @@ const MANIFEST: &str = "[package]\nname = \"demo\"\nversion = \"0.1.0\"\nedition
 
 const GEAR_GDL: &str = r#"
 gear(
+    maturity = "stable",
     name = "Demo",
     description = "d",
     category = "core-functionality",

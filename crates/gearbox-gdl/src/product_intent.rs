@@ -401,7 +401,7 @@ fn build_gears(
 /// The collision checked here is the one the product file can answer on its own:
 /// the same implementation named twice for one host in one profile. Whether two
 /// *different* plugins collide is a catalogue question -- it depends on which
-/// extension point each fills -- and is checked where the catalogue is in scope.
+/// extension point each implements -- and is checked where the catalogue is in scope.
 fn build_plugins(
     uri: &str,
     host: &GearId,

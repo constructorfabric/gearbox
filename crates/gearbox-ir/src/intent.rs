@@ -367,7 +367,7 @@ pub struct GearSelection {
 
 /// One plugin implementation chosen for a host gear.
 ///
-/// Which extension point it fills is a catalogue fact, not recorded here: the
+/// Which extension point it implements is a catalogue fact, not recorded here: the
 /// product names an implementing gear and the catalogue says what that gear
 /// implements. Recording it twice would let the two disagree.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]

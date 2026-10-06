@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use gearbox_gdl::GdlEngine;
 use gearbox_gdl::engine::FileIdentity;
 use gearbox_ir::{
-    Catalogue, ContractDescriptor, ContractId, Diagnostic, DiagnosticCode, Diagnostics,
+    Catalogue, ContractDescriptor, ContractId, DesignGear, Diagnostic, DiagnosticCode, Diagnostics,
     GearDescriptor, GearId, LoadStage, Location, PendingGear, RelPath,
 };
 
@@ -69,6 +69,11 @@ pub enum LoadEvent<'a> {
     /// One description was evaluated. Its declared facts are now known.
     Declared(&'a PendingGear),
 
+    /// One description was evaluated and is a design gear, which is complete
+    /// as declared: it has no crate, so it is never pending and never
+    /// `Projected`. Sent during the first pass, before `DeclarationComplete`.
+    Design(&'a DesignGear),
+
     /// Every description has been evaluated; parsing is about to begin.
     ///
     /// The boundary between the two passes, and a real one rather than a
@@ -90,7 +95,7 @@ pub enum LoadEvent<'a> {
 
     /// A gear already sent as `Projected` changed once every gear was known.
     ///
-    /// A plugin's `fills` names only a spec; the point it joins is its host's
+    /// A plugin's `implements` names only a spec; the point it joins is its host's
     /// declaration, and the host may be described later in discovery order. So
     /// the join runs after the last projection, and the plugins it completes
     /// are sent again. Not counted as progress: the gear was counted once.
@@ -143,7 +148,7 @@ pub fn load_catalogue_staged(
     let mut catalogue = Catalogue::default();
     let mut contracts = ContractMerge::default();
     // What each gear's crate implements, kept aside for the plugin join below:
-    // evidence a declared `fills` is checked against, not part of the descriptor.
+    // evidence a declared `implements` is checked against, not part of the descriptor.
     let mut implemented: BTreeMap<gearbox_ir::GearId, std::collections::BTreeSet<String>> =
         BTreeMap::new();
     let mut diagnostics = Diagnostics::new();
@@ -240,6 +245,31 @@ pub fn load_catalogue_staged(
         diagnostics.extend(outcome.diagnostics);
         let Some(decl) = outcome.value else { continue };
 
+        if decl.maturity == Some(gearbox_gdl::Maturity::Design) {
+            let Some(design) = design_gear(root, &identity, &decl, &mut scans, &mut diagnostics)
+            else {
+                continue;
+            };
+            let id = design.id.clone();
+            // The same rule as for gears below: the first declaration wins.
+            if let Some(previous) = catalogue.designs.get(&id) {
+                diagnostics.push(declared_twice(
+                    &id,
+                    (&previous.gdl_path, &previous.source),
+                    &identity,
+                ));
+                continue;
+            }
+            catalogue.designs.insert(id.clone(), design);
+            if let Some(stored) = catalogue.designs.get(&id)
+                && on_event(LoadEvent::Design(stored)) == Continue::Stop
+            {
+                stopped = true;
+                break;
+            }
+            continue;
+        }
+
         let entry = PendingGear {
             source: root.id.clone(),
             gdl_path: identity.gdl_path.clone(),
@@ -306,20 +336,11 @@ pub fn load_catalogue_staged(
             // a product's own `sources` list, "earliest" is an order the person
             // wrote down. See ADR `cpt-gearbox-adr-multiple-source-roots`.
             if let Some(previous) = catalogue.gears.get(&id) {
-                diagnostics.push(
-                    Diagnostic::error(
-                        DiagnosticCode::GdlCardinality,
-                        format!(
-                            "gear `{id}` is declared twice: `{}` in source `{}` and `{}` in \
-                             source `{}`; the first is the one in the catalogue",
-                            previous.gdl_path, previous.source, identity.gdl_path, identity.source
-                        ),
-                        "one of the descriptions points at the wrong crate, or names the wrong \
-                         attribute with `attr = \"...\"`; if both are wanted, they need distinct \
-                         gear ids",
-                    )
-                    .at(Location::file(identity.uri.clone())),
-                );
+                diagnostics.push(declared_twice(
+                    &id,
+                    (&previous.gdl_path, &previous.source),
+                    identity,
+                ));
             } else {
                 catalogue.gears.insert(id.clone(), merged.gear);
             }
@@ -336,6 +357,35 @@ pub fn load_catalogue_staged(
     }
 
     catalogue.contracts = contracts.finish();
+
+    // A gear that has code and a design description of the same id: someone
+    // wrote the crate and left the design behind. Both stay listed -- the
+    // resolver only ever reads `gears`, so the gear with code is the one used
+    // -- and the stale description is reported.
+    for (id, design) in &catalogue.designs {
+        if let Some(gear) = catalogue.gears.get(id) {
+            diagnostics.push(
+                Diagnostic::error(
+                    DiagnosticCode::GdlCardinality,
+                    format!(
+                        "gear `{id}` has code (`{}` in source `{}`) and is also described at \
+                         design maturity (`{}` in source `{}`)",
+                        gear.gdl_path, gear.source, design.gdl_path, design.source
+                    ),
+                    "the gear has outgrown its design description: delete that `gear.gdl`, \
+                     moving anything still true of the gear into the one beside its crate",
+                )
+                .at(Location::or_file(
+                    design.declared_at.as_ref(),
+                    &roots
+                        .iter()
+                        .find(|r| r.id == design.source)
+                        .map(|r| gearbox_ir::file_uri(&r.root.join(design.gdl_path.as_str())))
+                        .unwrap_or_default(),
+                )),
+            );
+        }
+    }
 
     // The whole gear set is known only here. Inside the loop above,
     // `catalogue.gears` holds only what `discover()`'s sorted order has reached,
@@ -372,6 +422,66 @@ pub fn load_catalogue_staged(
         scan_requests: scans.scan_requests(),
         pending,
     }
+}
+
+/// "Declared twice", for a gear or a design gear: the first one is kept.
+fn declared_twice(
+    id: &gearbox_ir::GearId,
+    (previous_path, previous_source): (&gearbox_ir::RelPath, &gearbox_ir::SourceId),
+    identity: &FileIdentity,
+) -> Diagnostic {
+    Diagnostic::error(
+        DiagnosticCode::GdlCardinality,
+        format!(
+            "gear `{id}` is declared twice: `{previous_path}` in source `{previous_source}` and \
+             `{}` in source `{}`; the first is the one in the catalogue",
+            identity.gdl_path, identity.source
+        ),
+        "one of the descriptions points at the wrong crate, or names the wrong attribute with \
+         `attr = \"...\"`; if both are wanted, they need distinct gear ids",
+    )
+    .at(Location::file(identity.uri.clone()))
+}
+
+/// A design gear, built from its declaration alone.
+///
+/// No crate is looked for and nothing is projected. The SDK, when declared,
+/// is still checked against its `Cargo.toml` -- it is the one crate a design
+/// gear names, and a wrong name there fails the day the gear gets code.
+fn design_gear(
+    root: &SourceRoot,
+    identity: &FileIdentity,
+    decl: &gearbox_gdl::GearDecl,
+    scans: &mut crate::scans::CrateScans,
+    diagnostics: &mut Diagnostics,
+) -> Option<DesignGear> {
+    // `gear()` refuses a design gear without a valid id, so this cannot fail
+    // for a declaration that evaluated.
+    let id = gearbox_ir::GearId::new(decl.id.as_deref()?).ok()?;
+    crate::manifest_check::check(root, identity, decl, scans, diagnostics);
+    let uri = identity.uri.as_str();
+    let gdl_dir = identity.gdl_path.parent();
+    let docs = crate::docs::project(
+        &root.root,
+        &root.root.join(gdl_dir.as_str()),
+        identity,
+        decl,
+        diagnostics,
+    );
+    Some(DesignGear {
+        display_name: decl.name.clone().unwrap_or_else(|| id.to_string()),
+        id,
+        description: decl.description.clone(),
+        category: decl.category.clone(),
+        source: root.id.clone(),
+        gdl_path: identity.gdl_path.clone(),
+        sdk: decl
+            .sdk
+            .as_ref()
+            .map(|r| crate::merge::cargo_ref(r, &gdl_dir, "sdk", uri, diagnostics)),
+        docs,
+        declared_at: decl.declared_at.clone(),
+    })
 }
 
 /// Project the Rust half for one description and merge it with the declared half.
@@ -761,20 +871,20 @@ fn point_sdks<'d>(
         .collect()
 }
 
-/// Join every plugin's declared `fills` to the host that declares its spec.
+/// Join every plugin's declared `implements` to the host that declares its spec.
 ///
 /// Run once the whole gear set is known, because discovery order says nothing
 /// about hosts coming first. A plugin names only the spec; the trait and SDK are
-/// the host's to state, so `fills.point` is copied from the host's declaration.
+/// the host's to state, so `implements.point` is copied from the host's declaration.
 ///
 /// - no described gear declares the spec: GBX0519;
-/// - two gears declare it: which one a plugin fills has no answer, so the
+/// - two gears declare it: which one a plugin implements has no answer, so the
 ///   second is refused (`GdlCardinality`) and the first is used;
 /// - the plugin's crate implements none of the point's trait: GBX0526, a
 ///   warning -- the impl is evidence, and it can hide behind a wrapper this
 ///   reader does not follow.
 ///
-/// Returns the plugins whose `fills.point` it set, so a streaming consumer that
+/// Returns the plugins whose `implements.point` it set, so a streaming consumer that
 /// saw them before the join can be sent them again.
 fn join_plugin_points(
     catalogue: &mut Catalogue,
@@ -793,7 +903,7 @@ fn join_plugin_points(
                     DiagnosticCode::GdlCardinality,
                     format!(
                         "extension point `{}` is declared by both `{first}` and `{id}`; a plugin \
-                         that fills it would have two hosts",
+                         that implements it would have two hosts",
                         point.spec
                     ),
                     "one host declares a spec; remove the other `extension_point(...)`",
@@ -809,7 +919,7 @@ fn join_plugin_points(
     }
 
     for (id, gear) in &mut catalogue.gears {
-        let Some(fill) = gear.fills.as_mut() else {
+        let Some(fill) = gear.implements.as_mut() else {
             continue;
         };
         let at = |gear: &GearDescriptor| {
@@ -827,11 +937,11 @@ fn join_plugin_points(
                 let mut diagnostic = Diagnostic::error(
                     DiagnosticCode::PluginSpecUndeclared,
                     format!(
-                        "`{id}` fills `{own}`, which no described gear declares as an extension \
+                        "`{id}` implements `{own}`, which no described gear declares as an extension \
                          point"
                     ),
                     "the host declares `extension_points = [extension_point(\"...\", trait = \
-                     \"...\")]`; describe it, or fix the spec in `fills`",
+                     \"...\")]`; describe it, or fix the spec in `implements`",
                 );
                 if let Some(location) = at(gear) {
                     diagnostic = diagnostic.at(location);
@@ -848,12 +958,12 @@ fn join_plugin_points(
                     let mut diagnostic = Diagnostic::new(
                         DiagnosticCode::PluginImplMissing,
                         format!(
-                            "`{id}` fills `{host}`'s point, and its crate implements no `{}`",
+                            "`{id}` implements `{host}`'s point, and its crate implements no `{}`",
                             point.qualified()
                         ),
                     )
                     .with_help(
-                        "check the spec in `fills`; if the impl is behind a wrapper this is \
+                        "check the spec in `implements`; if the impl is behind a wrapper this is \
                          only a note",
                     );
                     if let Some(location) = at(gear) {

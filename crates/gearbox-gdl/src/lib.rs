@@ -51,5 +51,5 @@ pub(crate) mod values;
 pub mod vocabulary;
 
 pub use engine::{EvalOutcome, FileIdentity, GdlEngine};
-pub use sink::{GearDecl, ProductDecl};
+pub use sink::{GearDecl, Maturity, ProductDecl};
 pub use values::{GdlEnum, GdlNamespace};

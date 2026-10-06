@@ -212,6 +212,15 @@ export class GetGearTool extends GearboxTool {
           return createToolCallError("`gear` must be the gear's kebab-case id.");
         }
         const row = this.rowForGear(gear);
+        const design = this.catalogue.current.rows.find(
+          (candidate) => candidate.kind === "design" && candidate.gear.id === gear,
+        );
+        if (row === undefined && design !== undefined) {
+          return createToolCallError(
+            `\`${gear}\` is described at design maturity: it has no crate yet, so it cannot be ` +
+              `added to a product. Its description is \`${design.gear.gdl_path}\`.`,
+          );
+        }
         if (row === undefined || row.kind !== "projected") {
           return createToolCallError(
             `The catalogue has no projected gear called \`${gear}\`. Use ` +

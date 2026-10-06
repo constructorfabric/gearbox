@@ -263,7 +263,7 @@ fn a_completed_load_is_cached() {
     std::fs::create_dir_all(crate_dir.join("src")).unwrap();
     std::fs::write(
         crate_dir.join("gear.gdl"),
-        "gear(\n  name = \"Demo\",\n  category = \"example\",\n  \
+        "gear(\n  maturity = \"stable\",\n  name = \"Demo\",\n  category = \"example\",\n  \
          package = cargo(crate_name = \"demo\", lib = \"demo\", path = \".\"),\n)\n",
     )
     .unwrap();
@@ -337,7 +337,7 @@ fn a_load_that_stopped_early_is_not_cached() {
     // something to fail on. An empty root would finish without ever sending.
     std::fs::write(
         dir.join("gear.gdl"),
-        "gear(\n  name = \"Demo\",\n  category = \"example\",\n  \
+        "gear(\n  maturity = \"stable\",\n  name = \"Demo\",\n  category = \"example\",\n  \
          package = cargo(crate_name = \"demo\", lib = \"demo\", path = \".\"),\n)\n",
     )
     .unwrap();

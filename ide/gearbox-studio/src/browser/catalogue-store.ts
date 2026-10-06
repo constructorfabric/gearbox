@@ -502,6 +502,11 @@ export class CatalogueStore implements Omit<GearboxClient, "onDocumentDiagnostic
         carried?.kind === "projected" ? carried : { kind: "pending", gear },
       );
     }
+    // Complete already: there is no projection to wait for, so no refresh
+    // can downgrade one.
+    for (const gear of loaded.designs) {
+      this.rowsByKey.set(keyFor(gear.source, gear.gdl_path), { kind: "design", gear });
+    }
     this.state = {
       status: "loading",
       rows: this.sorted(),

@@ -39,6 +39,7 @@ const CONSUMER_MANIFEST: &str = "[package]\nname = \"consumer\"\nversion = \"0.1
 
 const CONSUMER_GEAR_GDL: &str = r#"
 gear(
+    maturity = "stable",
     name = "Consumer",
     description = "d",
     category = "core-functionality",

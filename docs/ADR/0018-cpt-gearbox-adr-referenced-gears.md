@@ -119,7 +119,7 @@ Verified by reading, not inferred:
 installation(
     id = "platform",
     at = "http://platform-host:50051",
-    gears = ["gear-orchestrator", "grpc-hub", "types-registry", "authn-resolver"],
+    gears = ["service-discovery", "grpc-hub", "types-registry", "authn-resolver"],
 )
 ```
 
@@ -135,11 +135,11 @@ installation(
 `directoryEndpoint`. **It is an address, not a binding, and that is why it is
 declared rather than derived**: everything resolves *through* the directory over
 a raw `DirectoryGrpcClient`, not through `#[toolkit::consumes]`
-(`READINESS.md`, the `gear-orchestrator` row). There is no contract edge to
+(`READINESS.md`, the `service-discovery` row). There is no contract edge to
 carry it.
 
 `gears` is what the installation runs. Gearbox already knows two of them are
-mandatory: `resolve/structural.rs` holds `DIRECTORY_SERVER = "gear-orchestrator"`
+mandatory: `resolve/structural.rs` holds `DIRECTORY_SERVER = "service-discovery"`
 and `GRPC_HUB = "grpc-hub"` as constants and `check_discovery` requires the
 first in the host application. That those are hard-coded in the tool rather than
 declared by the platform is a seam this decision leans on and does not fix.
@@ -225,7 +225,7 @@ real use of this feature would fail on red herrings:
   gRPC-registering gears and no hub — and under an installation the hub is
   `platform-host`'s.
 * `check_discovery` raises `GBX0308` when a directory-discovery profile has no
-  `gear-orchestrator` in the host, and `GBX0309` when it has no `grpc-hub`.
+  `service-discovery` in the host, and `GBX0309` when it has no `grpc-hub`.
   These are the two constants from decision 1: the check already encodes
   "required", it just assumes required means *local*.
 
@@ -319,12 +319,12 @@ happened, and that claim is corrected there.
   the platform and asserting: no application for the referenced gear, no crate,
   no chart, and a consumer wired to the Service name read from its `deploy/`.
 * **Projection is confirmed against the corpus, not a fixture**: an
-  installation naming `gear-orchestrator`, `grpc-hub`, `types-registry` and
+  installation naming `service-discovery`, `grpc-hub`, `types-registry` and
   `authn-resolver` must offer exactly the contracts those four declare, and one
   naming `credstore` must report `GBX0208` rather than an empty surface.
 * The reachability exemptions are confirmed by the three cases that are false
   positives today: a local gRPC gear whose hub is in the installation
-  (`GBX0314`), and a directory-discovery profile whose `gear-orchestrator`
+  (`GBX0314`), and a directory-discovery profile whose `service-discovery`
   (`GBX0308`) and `grpc-hub` (`GBX0309`) are in the installation.
 * The embed-in-every-application category needs **no** new confirmation, and
   saying so is the point: the existing closure claims already assert that a gear

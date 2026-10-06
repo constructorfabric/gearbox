@@ -51,6 +51,9 @@ pub use error_enum::{ProjectedErrorEnum, ProjectedErrorVariant, project_error_en
 pub use gear::{ProjectedGear, ProjectedLifecycle, project_gear};
 pub use gts::{GtsError, GtsType, gts_type_from_schema, project_gts_types};
 pub use manifest::{CrateManifest, ManifestError, project_manifest};
-pub use plugin::{VendorDefault, implemented_traits, project_vendor_default, public_traits};
+pub use plugin::{
+    VendorDefault, implemented_traits, project_field_str_default, project_vendor_default,
+    public_traits,
+};
 pub use profile::{ProfileProjectionError, ProjectedProfile, project_cluster_profiles};
 pub use scan::{MAX_FILE_BYTES, MAX_FILES, RustFile, ScanError, items, scan_crate};

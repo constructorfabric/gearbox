@@ -84,7 +84,7 @@ fn a_fragment_inside_the_root_loads() {
     let codes = fx.eval(
         r#"
 load("//shared.gdl", "SHARED")
-gear(package = SHARED, name = "Demo")
+gear(maturity = "stable", package = SHARED, name = "Demo")
 "#,
     );
     assert!(
@@ -99,7 +99,7 @@ fn climbing_above_the_root_is_refused() {
     let codes = fx.eval(
         r#"
 load("../../../outside.gdl", "SECRET")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert_eq!(
@@ -116,7 +116,7 @@ fn an_absolute_path_is_refused() {
     let src = format!(
         r#"
 load("{}", "SECRET")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
         absolute.display()
     );
@@ -130,7 +130,7 @@ fn a_root_relative_escape_is_refused() {
     let codes = fx.eval(
         r#"
 load("//../outside.gdl", "SECRET")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert_eq!(codes, [DiagnosticCode::GdlLoadEscape]);
@@ -146,7 +146,7 @@ fn a_fragment_is_held_to_the_same_declarative_standard() {
     let codes = fx.eval(
         r#"
 load("//sneaky.gdl", "X")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert!(
@@ -227,7 +227,7 @@ fn a_symlink_inside_the_root_pointing_out_of_it_is_refused() {
     let codes = fx.eval(
         r#"
 load("//link.gdl", "SECRET")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert_eq!(
@@ -251,7 +251,7 @@ fn a_symlink_to_a_directory_outside_the_root_is_refused() {
     let codes = fx.eval(
         r#"
 load("//linked/frag.gdl", "SECRET")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert_eq!(codes, [DiagnosticCode::GdlLoadEscape]);
@@ -271,7 +271,7 @@ fn a_fragment_may_load_another_fragment() {
     let codes = fx.eval(
         r#"
 load("//outer.gdl", "OUTER")
-gear(package = OUTER, name = "Demo")
+gear(maturity = "stable", package = OUTER, name = "Demo")
 "#,
     );
     assert!(codes.is_empty(), "a nested fragment should load: {codes:?}");
@@ -292,7 +292,7 @@ fn a_fragment_may_not_climb_out_of_the_root_either() {
     let codes = fx.eval(
         r#"
 load("climber.gdl", "STOLEN")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert!(
@@ -313,7 +313,7 @@ fn a_load_cycle_is_a_diagnostic_rather_than_a_stack_overflow() {
     let codes = fx.eval(
         r#"
 load("//a.gdl", "A")
-gear(package = cargo(crate_name = "c", lib = "c"))
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"))
 "#,
     );
     assert!(
@@ -342,7 +342,7 @@ fn one_fragment_loaded_twice_is_evaluated_once() {
         r#"
 load("//left.gdl", "LEFT")
 load("//right.gdl", "RIGHT")
-gear(package = LEFT, name = "Demo")
+gear(maturity = "stable", package = LEFT, name = "Demo")
 "#,
     );
     assert!(codes.is_empty(), "a diamond should load cleanly: {codes:?}");
@@ -361,7 +361,7 @@ fn a_fragment_may_not_declare_a_gear() {
     let fx = Fixture::new("declares");
     fs::write(
         fx.root().join("declaring.gdl"),
-        "gear(package = cargo(crate_name = \"c\", lib = \"c\"))\n",
+        "gear(maturity = \"stable\", package = cargo(crate_name = \"c\", lib = \"c\"))\n",
     )
     .expect("write declaring");
 

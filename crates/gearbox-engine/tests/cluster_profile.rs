@@ -24,6 +24,7 @@ use gearbox_ir::{Diagnostics, SourceId};
 
 const GEAR_GDL: &str = r#"
 gear(
+    maturity = "stable",
     name = "Demo",
     description = "A cluster consumer.",
     category = "platform",

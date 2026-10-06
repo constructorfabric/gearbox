@@ -251,7 +251,7 @@ fn bindings() -> Vec<ResolvedBinding> {
         mode: ResolvedBindingMode::Remote,
         transport: Transport::Rest,
         mechanism: BindingMechanism::ConsumesDirectory,
-        endpoint_source: Some("directory:gear-orchestrator/api-contracts".to_owned()),
+        endpoint_source: Some("directory:service-discovery/api-contracts".to_owned()),
         endpoint: None,
         critical: false,
         selected: Selected::honoured(BindingRequest {

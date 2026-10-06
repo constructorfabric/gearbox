@@ -154,8 +154,30 @@ fn check_selections(
     uri: &str,
     diagnostics: &mut Diagnostics,
 ) {
+    // What it selects below `stable`. The selections only: validate does not
+    // resolve, so what they pull in is not known here (resolve says that).
+    // A set, because two profiles may each name the same gear.
+    let selected: std::collections::BTreeSet<&gearbox_ir::GearId> =
+        intent.selected_gears.iter().map(|s| &s.gear).collect();
+    let selected = selected
+        .into_iter()
+        .map(|g| (g, std::slice::from_ref(&gearbox_ir::InclusionReason::Selected)));
+    crate::resolve::closure::maturity_diagnostics(
+        &scan.catalogue,
+        selected,
+        intent,
+        uri,
+        diagnostics,
+    );
+
     for selection in &intent.selected_gears {
         if scan.catalogue.gears.contains_key(&selection.gear) {
+            continue;
+        }
+        let at = gearbox_ir::Location::or_file(selection.declared_at.as_ref(), uri);
+        if let Some(design) = crate::resolve::closure::at_design(&scan.catalogue, &selection.gear, &at)
+        {
+            diagnostics.push(design);
             continue;
         }
 
@@ -220,7 +242,8 @@ fn skeleton(found: &crate::undescribed::UndescribedGear) -> String {
     };
     format!(
         "add `{}/gear.gdl` with `package = cargo(crate_name = \"{}\", lib = \"{}\", \
-         path = \".\")`; capabilities and dependencies are projected from the attribute, \
+         path = \".\")` and a `maturity` (\"experimental\", \"preview\", \"stable\" or \
+         \"deprecated\"); capabilities and dependencies are projected from the attribute, \
          so do not restate them",
         found.crate_dir, manifest.package_name, manifest.lib_ident
     )

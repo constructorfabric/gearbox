@@ -50,12 +50,12 @@ test.describe("projected facts", () => {
     expect(detail).toMatch(/selects vendor/);
   });
 
-  test("a plugin shows which point it fills and its compiled-in vendor [PRD cpt-gearbox-fr-plugin-extension-points]", async ({
+  test("a plugin shows which point it implements and its compiled-in vendor [PRD cpt-gearbox-fr-plugin-extension-points]", async ({
     studio,
   }) => {
     const detail = await studio.detailOf("OIDC AuthN Plugin");
     expect(detail).not.toBeNull();
-    expect(detail).toMatch(/fills/);
+    expect(detail).toMatch(/implements/);
     expect(detail).toContain("AuthNResolverPluginClient");
     // This gear is the evidence for the "both spellings" half of the
     // requirement: `oidc-authn-plugin` declares its default through
@@ -79,7 +79,7 @@ test.describe("projected facts", () => {
     // Read structurally: the vendor is the last `<code>` run of the row, because
     // `textContent` runs the next row's first word straight onto it.
     const selector = host?.["extension points"]?.codes.at(-1);
-    const provided = plugin?.fills?.codes.at(-1);
+    const provided = plugin?.implements?.codes.at(-1);
     expect(selector, "the host renders no vendor selector").toBeTruthy();
     expect(provided, "the plugin renders no default vendor").toBeTruthy();
     expect(provided).toBe(selector);
@@ -120,7 +120,8 @@ test.describe("projected facts", () => {
       ),
     );
     expect(groups.length).toBeGreaterThan(1);
-    // The seven values come from `gear.toml` files the platform team committed.
+    // The seven values come from `gear.toml` files the platform team committed,
+    // since folded into each `gear.gdl`.
     // "platform" is not one of them, and its appearance would mean the widget had
     // invented a bucket.
     expect(groups).not.toContain("platform");

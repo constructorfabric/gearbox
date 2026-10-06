@@ -23,7 +23,7 @@ use gearbox_ir::{
 use super::partition::Partition;
 
 /// The gear that answers directory lookups.
-const DIRECTORY_SERVER: &str = "gear-orchestrator";
+const DIRECTORY_SERVER: &str = "service-discovery";
 /// The gear that publishes the endpoint the spawn phase waits for.
 const GRPC_HUB: &str = "grpc-hub";
 

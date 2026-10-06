@@ -465,6 +465,7 @@ mod support;
 // what fails, which is the diagnostic being anchored.
 
 const BROKEN_GEAR: &str = r#"gear(
+    maturity = "stable",
     name = "probe-gear",
     category = "example",
     package = cargo(crate_name = "probe", lib = "probe", path = "/absolute/nowhere"),
@@ -517,6 +518,7 @@ const DOCS_MANIFEST: &str = "[package]\nname = \"probe\"\nversion = \"0.1.0\"\ne
      [lib]\nname = \"probe\"\npath = \"src/lib.rs\"\n";
 
 const DOCS_GEAR: &str = r#"gear(
+    maturity = "stable",
     name = "probe-gear",
     category = "example",
     package = cargo(crate_name = "probe", lib = "probe", path = "."),

@@ -33,7 +33,7 @@ const REAL_GEAR_NAMES: &[&str] = &[
     "credstore",
     "event-broker",
     "file-parser",
-    "gear-orchestrator",
+    "service-discovery",
     "gear-v2",
     "grpc-hub",
     "keycloak-idp-plugin",

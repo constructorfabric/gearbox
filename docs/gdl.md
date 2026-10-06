@@ -203,12 +203,20 @@ role(name, directory_name?, labels = [])
 
 Parsed and stored. The runtime takes whatever directory name it is given; what cannot express a second role is the model here, one application per anchor gear, so a role nothing anchors has nowhere to go. That is **GBX0318** at resolution. Sharding and per-instance addressing are a separate gap, **GBX0602**. Both are warnings: the description is not wrong, it describes a shape this tool does not build yet.
 
-### `extension_point(spec, trait = ..., sdk = ...)`
+### `extension_point(spec, trait = ..., sdk = ..., selector = ...)`
 
 One point a host lets plugins fill. `spec` is positional and is the identity: the GTS spec's own
 segment, without the `cf.toolkit.plugins.plugin.v1~` base every plugin spec shares. `trait` is the
 interface plugins register under. `sdk` is written only when that trait lives outside the gear's
 own `sdk`.
+
+`selector` names the host's config field it picks a plugin by, as a dotted path: `selector =
+"idp.vendor"`. Its default is read at that path, and a product overrides it there --
+`config = {"idp": {"vendor": "keycloak"}}`. Omitted, the selector is the config's top-level
+`vendor`. Write it when the config has more than one `vendor`: account-management selects its IdP
+plugin by `idp.vendor` and registers itself as a tenant-resolver plugin under
+`tr_plugin.vendor`. A path that leads nowhere, or two points naming different selectors, is
+**GBX0516**.
 
 ```python
 extension_points = [
@@ -216,14 +224,14 @@ extension_points = [
 ],
 ```
 
-A plugin names the same segment: `fills = "cf.core.authn_resolver.plugin.v1~"`, and declares no
+A plugin names the same segment: `implements = "cf.core.authn_resolver.plugin.v1~"`, and declares no
 `sdk` -- the host's SDK is the host's.
 
 Both are checked, not trusted:
 
 - the spec must be a `PluginV1`-derived GTS type the gear's `sdk` declares, and the trait a
   `pub trait` in the crate the point names (GBX0516);
-- a `fills` no described gear declares is GBX0519;
+- an `implements` no described gear declares is GBX0519;
 - a plugin whose crate implements none of the point's trait gets a warning (GBX0526).
 
 Why declared: see ADR-0002, Amendment 2026-09-24.
@@ -236,11 +244,12 @@ Positional. States that this description is invalid. Not a branch.
 
 ```
 gear(
-  package,                          # cargo, required
+  maturity,                         # required, no default -- see below
+  package,                          # cargo, required unless maturity = "design"
   name?, description?, category?, visibility?,
   sdk?,                             # cargo, where this gear's own SDK crate lives
   extension_points = [],            # extension_point(...), points plugins fill
-  fills?,                           # spec segment of the point this plugin fills
+  implements?,                      # spec segment of the point this plugin implements
   docs?,                            # docs(...)
   provides = [],                    # provide(...)
   consumes = [],                    # consume(...)
@@ -274,6 +283,60 @@ These fields are accepted only to be refused by name (**GBX0210**). They live in
 | `cluster_providers` | `ClusterGear::provider_registry()` |
 
 `lifecycle(...)` exists as a constructor (`entry?`, `stop_timeout?`, `await_ready = False`) so a restatement can be named. Passing it to `gear()` is still **GBX0210**.
+
+### `maturity`: how much a gear promises
+
+Required on every `gear(...)`, with **no default**. A default of `stable` would turn a forgotten
+field into a promise nobody made, and any lower default into an accusation, so the author says
+which. Missing or misspelt, the description does not evaluate.
+
+| `maturity` | Means | In the catalogue | In a product |
+|---|---|---|---|
+| `"design"` | documents (perhaps an SDK), no crate yet | `Catalogue.designs` | **GBX0321**, error |
+| `"experimental"` | code exists; API and behaviour may change freely | `gears` | **GBX0322**, warning |
+| `"preview"` | usable, not declared stable | `gears` | **GBX0323**, info |
+| `"stable"` | supported for ordinary production use | `gears` | nothing |
+| `"deprecated"` | still available, not for new products | `gears` | **GBX0324**, warning |
+
+A product is told about every gear it links below `stable`, including the ones it did not choose:
+a co-located dependency or a plugin is in the same binary, and the message says what pulled it in.
+`validate` reports the selections only, since it does not resolve. None of the four blocks a lock
+or generation; `design` does, because there is nothing to link.
+
+A newly scaffolded gear is `"experimental"`. There is no second axis for "how much code exists":
+a gear with only an SDK is `"design"` with `sdk = cargo(...)`.
+
+### `maturity = "design"`: a gear with no code yet
+
+A gear can be described before its crate exists: what it is for, where its documents are, and
+the id it will have. It is listed in the catalogue apart from the gears that can be used
+(`Catalogue.designs`), nothing is projected, and a product that names it is **GBX0321** -- not
+GBX0301, because the gear is neither a typo nor in a closed source root.
+
+```python
+gear(
+    maturity = "design",
+    id = "approval-service",
+    name = "Approval Service",
+    description = "Multi-step approvals for tenant operations.",
+    category = "core-functionality",
+    sdk = cargo(crate_name = "cf-approval-sdk", lib = "approval_sdk", path = "approval-sdk"),  # when one exists
+)
+```
+
+The rules:
+
+- `id` is required, and must be a gear id. It is the one place an id is declared: a stable
+  gear's id is projected, and restating it stays **GBX0210**.
+- `name`, `description`, `category`, `sdk` and `docs` are the whole vocabulary. Everything else
+  describes code -- `package`, `implements`, `extension_points`, `provides`, `serves`,
+  `visibility` and the rest -- and is refused at evaluation.
+- Documents are found by the same convention as for any gear, beside the description.
+- A design id that also has a gear with code is **GBX0105**, the same code as a gear declared
+  twice: the design description has been outgrown and should be deleted.
+
+This is what replaced the platform's `gear.toml` for the gears that had only documents
+(ADR-0002, Amendment 2026-10-02).
 
 ---
 
@@ -473,6 +536,7 @@ PAYMENT_SDK = cargo(
 
 gear(
     name = "Payments Audit",
+    maturity = "experimental",
     category = "example",
     visibility = "public",
     package = cargo(crate_name = "cf-gears-payments-audit", lib = "payments_audit", path = "."),
@@ -523,7 +587,7 @@ product(
     default_profile = "dev",
     gears = [
         use_gear("api-gateway", source = "gears-rust"),
-        use_gear("gear-orchestrator", source = "gears-rust"),
+        use_gear("service-discovery", source = "gears-rust"),
         use_gear("api-contracts", source = "gears-rust"),
         use_gear("api-contracts-consumer", source = "gears-rust"),
         use_gear("cluster", source = "gears-rust"),

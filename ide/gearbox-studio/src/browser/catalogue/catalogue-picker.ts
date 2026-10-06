@@ -117,5 +117,6 @@ function describe(row: Row): string {
   if (row.gear.category !== null && row.gear.category !== undefined) {
     parts.push(row.gear.category);
   }
+  if (row.kind === "design") parts.push("design, no code yet");
   return parts.join(" · ");
 }

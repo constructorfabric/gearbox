@@ -13,11 +13,13 @@ decision-makers: Mike Yastrebtsov
 
 ## Context and Problem Statement
 
-Some gears cannot exist twice in one installation. `gear-orchestrator` is the
+Some gears cannot exist twice in one installation. `service-discovery` is the
 example: it is the directory, and the directory is one process's in-memory map.
+(Called `gear-orchestrator` when this was written; renamed upstream in
+gears-rust b6413f935.)
 
 `GearManager` is a `DashMap<String, Vec<Arc<GearInstance>>>` in the host
-runtime, and `gear-orchestrator` is a gRPC façade over it via
+runtime, and `service-discovery` is a gRPC façade over it via
 `LocalDirectoryClient`. There is no store, no replication, no gossip, no
 quorum -- the platform's own design note says so and answers only the question
 next to it: *"No DB; in-memory registry. Gears re-register on heartbeat, so
@@ -203,7 +205,7 @@ form ADR `cpt-gearbox-adr-referenced-gears` proposes.
 
 ### 8. A seam named, not fixed
 
-`resolve::structural` holds `DIRECTORY_SERVER = "gear-orchestrator"` and
+`resolve::structural` holds `DIRECTORY_SERVER = "service-discovery"` and
 `GRPC_HUB = "grpc-hub"` as constants, which ADR-0018 already called out: *"That
 those are hard-coded in the tool rather than declared by the platform is a seam
 this decision leans on and does not fix."* Once the directory declares its own
@@ -224,7 +226,7 @@ cardinality, that constant becomes derivable. This ADR does not derive it.
   `TOOLKIT_DIRECTORY_ENDPOINT` is one string and the Profile-2 diagram has one
   box. Writing it down is part of this change, not a side effect.
 * **The corpus confirms the quiet case and not the loud one.**
-  `gear-orchestrator` will declare the flag and *is* selected by
+  `service-discovery` will declare the flag and *is* selected by
   `payments-demo`, so this is the first role-shaped constraint with a real-tree
   case rather than only a fixture -- but in all three profiles it is in the host
   alone with one replica, so the expected observation is **silence**. Both
@@ -252,7 +254,7 @@ cardinality, that constant becomes derivable. This ADR does not derive it.
   tool half is a known gap rather than a loss.
 * **The corpus is confirmed to stay silent**, which is the claim that matters
   most: `the_slice_loads_without_diagnostics` and the three-profile resolution
-  test already assert a clean tree, and `gear-orchestrator` declaring the flag
+  test already assert a clean tree, and `service-discovery` declaring the flag
   must not change them.
 * **The collision is confirmed on a fixture, and its shape is known exactly**:
   a gear reached from the host's closure and forced out by an `application(...)`

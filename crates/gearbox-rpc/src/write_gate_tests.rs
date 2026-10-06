@@ -864,14 +864,14 @@ fn the_clients_scaffold_request_carries_its_plugin() {
     assert_eq!(plugin.spec, "cf.core.authn_resolver.plugin.v1~");
 }
 
-/// A plugin scaffold given a host writes `fills` live, and it still evaluates.
+/// A plugin scaffold given a host writes `implements` live, and it still evaluates.
 ///
 /// The commented shape exists because a spec no described gear declares is
 /// GBX0519. A host picked out of a loaded catalogue is not that -- but writing
 /// the declaration live means writing GDL from strings that came off the wire,
 /// and this is the gate that says the result still parses as a gear.
 #[test]
-fn a_plugin_scaffold_with_a_host_writes_a_live_fills() {
+fn a_plugin_scaffold_with_a_host_writes_a_live_implements() {
     use crate::protocol::GearKind;
 
     let files = super::scaffold_gear_files(
@@ -891,13 +891,13 @@ fn a_plugin_scaffold_with_a_host_writes_a_live_fills() {
     let gdl = gear_gdl(&files);
 
     // **Live, not commented, and checked over lines rather than by `contains`.**
-    // The commented shape's line is `# fills = ...`, which contains `fills =`.
+    // The commented shape's line is `# implements = ...`, which contains `implements =`.
     let live = |needle: &str| {
         gdl.lines()
             .any(|line| line.trim_start().starts_with(needle))
     };
     assert!(
-        live(r#"fills = "cf.core.authn_resolver.plugin.v1~""#),
+        live(r#"implements = "cf.core.authn_resolver.plugin.v1~""#),
         "the declaration is still commented: {gdl}"
     );
     assert!(!live("sdk = cargo("), "a plugin declares no sdk: {gdl}");
@@ -905,7 +905,10 @@ fn a_plugin_scaffold_with_a_host_writes_a_live_fills() {
         gdl.contains("AuthNResolverPluginClient") && gdl.contains("cf-gears-authn-resolver-sdk"),
         "the trait and its crate are named for the author: {gdl}"
     );
-    assert!(evaluates(gdl), "a live fills must still evaluate: {gdl}");
+    assert!(
+        evaluates(gdl),
+        "a live implements must still evaluate: {gdl}"
+    );
 }
 
 fn authn_point(path: &str) -> crate::protocol::PluginScaffold {
@@ -944,14 +947,14 @@ fn evaluates(gdl: &str) -> bool {
 /// The crate name, path and trait are written into `#` comments, where escaping
 /// is not the hazard -- a line break is. A path carrying one would end the
 /// comment and put the rest on its own line, evaluated as GDL; this one would
-/// declare a second `fills` and a `category` nobody chose.
+/// declare a second `implements` and a `category` nobody chose.
 #[test]
 fn a_plugin_scaffold_keeps_wire_values_inside_their_comments() {
     use crate::protocol::GearKind;
 
     for path in [
         r"..\shared\authn-resolver-sdk",
-        "../sdk\nfills = \"x.injected.plugin.v1~\",\ncategory = \"oss\",",
+        "../sdk\nimplements = \"x.injected.plugin.v1~\",\ncategory = \"oss\",",
     ] {
         let files = super::scaffold_gear_files(
             &ScaffoldGearParams {
@@ -971,7 +974,7 @@ fn a_plugin_scaffold_keeps_wire_values_inside_their_comments() {
         assert!(evaluates(gdl), "`{path}` must stay a comment: {gdl}");
         assert!(
             !gdl.lines()
-                .any(|l| l.trim_start().starts_with("fills = \"x.injected")),
+                .any(|l| l.trim_start().starts_with("implements = \"x.injected")),
             "nothing escaped its comment: {gdl}"
         );
         assert!(
@@ -1010,11 +1013,11 @@ fn a_plugin_scaffold_without_a_host_keeps_the_commented_locator() {
         .find(|(rel, _, _)| rel.as_str() == "gear.gdl")
         .expect("a gear.gdl")
         .1;
-    assert!(gdl.contains("# fills = "), "{gdl}");
+    assert!(gdl.contains("# implements = "), "{gdl}");
     for line in gdl.lines() {
         assert!(
-            !line.trim_start().starts_with("fills ="),
-            "an uncommented fills with no host to point at: {gdl}"
+            !line.trim_start().starts_with("implements ="),
+            "an uncommented implements with no host to point at: {gdl}"
         );
     }
 }
@@ -1086,7 +1089,7 @@ fn every_scaffold_shape_evaluates_and_carries_its_own_hints() {
             assert!(
                 !trimmed.starts_with("config_schema =")
                     && !trimmed.starts_with("sdk = ")
-                    && !trimmed.starts_with("fills")
+                    && !trimmed.starts_with("implements")
                     && !trimmed.starts_with("provides =")
                     && !trimmed.starts_with("consumes =")
                     && !trimmed.starts_with("description =")
@@ -1107,7 +1110,7 @@ fn every_scaffold_shape_evaluates_and_carries_its_own_hints() {
             GearKind::Service => {
                 assert!(gdl.contains("provides = [provide("), "{kind:?}");
                 assert!(gdl.contains("consumes = [consume("), "{kind:?}");
-                assert!(!gdl.contains("fills ="), "{kind:?}");
+                assert!(!gdl.contains("implements ="), "{kind:?}");
                 // Doc in the stub, not code -- the toolkit path is unknown here.
                 assert!(lib.contains("impl Gear"), "{kind:?}");
                 assert!(
@@ -1121,7 +1124,7 @@ fn every_scaffold_shape_evaluates_and_carries_its_own_hints() {
             GearKind::Plugin => {
                 // The declaration that makes it a plugin, commented until a
                 // host is chosen.
-                assert!(gdl.contains("# fills = "), "{kind:?}");
+                assert!(gdl.contains("# implements = "), "{kind:?}");
                 assert!(lib.contains("GBX0518"), "{kind:?}");
             }
         }
@@ -1370,7 +1373,7 @@ fn a_scaffold_with_the_toolkit_is_a_gear_the_catalogue_projects() {
     }
 
     // And the three together, as a source root: every one projects, none errs.
-    // The plugin fills a point no gear in this root declares, which is GBX0519
+    // The plugin implements a point no gear in this root declares, which is GBX0519
     // here and nothing to do with the scaffold, so it is left out of the count.
     let root = gearbox_engine::SourceRoot::open(SourceId::new("scaffolds").unwrap(), &tmp)
         .expect("a root");

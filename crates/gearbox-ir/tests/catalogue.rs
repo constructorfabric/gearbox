@@ -46,6 +46,7 @@ fn source_id() -> SourceId {
 fn gear(id: &str, deps: &[&str], caps: &[RuntimeCap]) -> GearDescriptor {
     let ident = id.replace('-', "_");
     GearDescriptor {
+        maturity: gearbox_ir::Maturity::Stable,
         one_per_installation: false,
         id: gid(id),
         display_name: id.to_owned(),
@@ -65,7 +66,7 @@ fn gear(id: &str, deps: &[&str], caps: &[RuntimeCap]) -> GearDescriptor {
         client_trait: None,
         cluster_providers: Vec::new(),
         extension_points: Vec::new(),
-        fills: None,
+        implements: None,
         vendor_selector: None,
         declared_roles: Vec::new(),
         available_features: BTreeSet::new(),
@@ -94,12 +95,13 @@ fn slice() -> Catalogue {
         gear("payments-audit", &["cluster"], &[Rest, Stateful]),
         gear("cluster", &[], &[Stateful]),
         gear("api-contracts", &[], &[Rest]),
-        gear("gear-orchestrator", &[], &[Grpc, System, Rest]),
+        gear("service-discovery", &[], &[Grpc, System, Rest]),
     ];
 
     Catalogue {
         gears: gears.into_iter().map(|g| (g.id.clone(), g)).collect(),
         contracts: BTreeMap::new(),
+        designs: BTreeMap::new(),
         sources: BTreeMap::from([(
             source_id(),
             ResolvedSource {

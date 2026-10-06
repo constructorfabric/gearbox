@@ -11,7 +11,7 @@
 
 use gearbox_ir::{
     ConfigValue, Diagnostic, ExplanationGraph, FileAction, FilePlan, GearDescriptor, Ownership,
-    PendingGear, ProductIntent, ResolvedProduct,
+    DesignGear, PendingGear, ProductIntent, ResolvedProduct,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -788,7 +788,7 @@ pub struct ScaffoldGearResult {
 /// previous comment-only form when it does not. In the description the
 /// difference is the next declaration each shape needs, written where it
 /// goes -- and for a plugin with no host chosen, written as a *comment*,
-/// because a `fills` naming a spec no described gear declares is refused
+/// because an `implements` naming a spec no described gear declares is refused
 /// (GBX0519). A scaffold must not produce a description that is already wrong.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -799,18 +799,18 @@ pub enum GearKind {
     /// A gear that does something on its own: the declared fields a service
     /// carries, and the configuration hint.
     Service,
-    /// A gear that fills another gear's extension point.
+    /// A gear that implements another gear's extension point.
     Plugin,
 }
 
-/// The point a scaffolded plugin fills, and the crate its trait lives in.
+/// The point a scaffolded plugin implements, and the crate its trait lives in.
 ///
 /// Chosen from a host gear the catalogue has already loaded, so every field
 /// here is something the engine told the client earlier.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 pub struct PluginScaffold {
     /// The spec's own GTS segment, e.g. `cf.core.authn_resolver.plugin.v1~`.
-    /// Written as `fills = "..."`: the declaration that makes this a plugin.
+    /// Written as `implements = "..."`: the declaration that makes this a plugin.
     pub spec: String,
     /// The trait the plugin implements, e.g. `AuthNResolverPluginClient`.
     pub trait_ident: String,
@@ -840,10 +840,10 @@ pub struct ScaffoldGearParams {
     /// before the field existed -- so an older client keeps its behaviour.
     #[serde(default)]
     pub kind: GearKind,
-    /// What this plugin fills, when the kind is [`GearKind::Plugin`].
+    /// What this plugin implements, when the kind is [`GearKind::Plugin`].
     ///
     /// **Absent keeps the commented shape, and that shape exists for a reason.**
-    /// A `fills` naming a spec no described gear declares is refused (GBX0519),
+    /// An `implements` naming a spec no described gear declares is refused (GBX0519),
     /// so with no host chosen a scaffold writes the declaration as a comment
     /// rather than produce a description that is already wrong.
     ///
@@ -941,6 +941,9 @@ pub struct CatalogueLoadResult {
     /// denominator immediately.
     pub total: u32,
     pub pending: Vec<PendingGear>,
+    /// Gears at design maturity. Complete as declared, so they arrive here
+    /// and never as `gearbox/catalogueChanged`: there is nothing to project.
+    pub designs: Vec<DesignGear>,
     /// Diagnostics raised while evaluating descriptions. Projection diagnostics
     /// arrive later, with the gears they belong to.
     pub diagnostics: Vec<Diagnostic>,

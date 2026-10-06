@@ -245,7 +245,7 @@ derivable from caps. It has not. Plugins are covered by GBX0514, and
 
 > **Amendment 2026-09-15: the condition above has been met, and the macro is
 > extended.** A gear that may exist only once in an installation --
-> `gear-orchestrator`, whose directory is one process's in-memory map -- is not
+> `service-discovery`, whose directory is one process's in-memory map -- is not
 > derivable from capabilities. The set is closed at seven, each backed by a
 > trait the gear macro asserts, so an eighth would need a trait invented for it;
 > and the property is about the installation rather than the process, which is a

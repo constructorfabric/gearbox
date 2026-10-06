@@ -40,7 +40,7 @@ use crate::records::{
     DocsRecord, EndpointRecord, ExtensionPointRecord, FeatureRecord, GrpcRecord, LifecycleRecord,
     ProvideRecord, RestRecord, RoleRecord,
 };
-use crate::sink::{GdlSink, GearDecl};
+use crate::sink::{GdlSink, GearDecl, Maturity};
 use crate::values::GdlEnum;
 use crate::vocabulary;
 
@@ -167,9 +167,31 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
         #[starlark(require = pos)] spec: &str,
         #[starlark(require = named)] r#trait: &str,
         #[starlark(require = named)] sdk: Option<&'v CargoRecord>,
+        // Where in the host's config the vendor it selects by lives. Declared
+        // because nothing in Rust says which `vendor` field is the selector:
+        // account-management has two, one it selects its IdP plugin by
+        // (`idp.vendor`) and one it registers itself under as a
+        // tenant-resolver plugin (`tr_plugin.vendor`).
+        #[starlark(require = named)] selector: Option<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<ExtensionPointRecord> {
         check_plugin_spec("extension_point", spec)?;
+        if let Some(path) = selector {
+            let valid = !path.is_empty()
+                && path.split('.').all(|seg| {
+                    let mut chars = seg.chars();
+                    chars
+                        .next()
+                        .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
+                        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                });
+            if !valid {
+                return Err(anyhow::anyhow!(
+                    "extension_point(\"{spec}\", selector = \"{path}\"): a selector is a dotted \
+                     path of config field names, e.g. `selector = \"idp.vendor\"`"
+                ));
+            }
+        }
         if r#trait.trim().is_empty() {
             return Err(anyhow::anyhow!(
                 "extension_point(\"{spec}\", trait = \"\") names no trait; write the \
@@ -180,6 +202,7 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
             spec: spec.to_owned(),
             trait_ident: r#trait.to_owned(),
             sdk: sdk.cloned(),
+            selector: selector.map(str::to_owned),
             declared_at: crate::declarative::call_location(eval),
         })
     }
@@ -429,7 +452,13 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] description: Option<&str>,
         #[starlark(require = named)] category: Option<&str>,
         #[starlark(require = named)] visibility: Option<&str>,
-        #[starlark(require = named)] package: &'v CargoRecord,
+        // Required for a gear with code, refused at `design`: it is what tells
+        // the projector which crate to scan, and a design gear has none yet.
+        #[starlark(require = named)] package: Option<&'v CargoRecord>,
+        // Required, no default; one of `Maturity::SPELLINGS`. Taken as an
+        // option only so its absence gets a message rather than "missing
+        // argument".
+        #[starlark(require = named)] maturity: Option<&str>,
         // A locator, like `cluster_plugins`: nothing in a gear's own crate says
         // where its SDK lives, and the SDK is what declares the GTS types this
         // gear exposes and the traits its extension points name.
@@ -437,7 +466,11 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
         // The plugin role, declared on both sides and keyed by GTS spec. See
         // `ExtensionPointRecord` for why this is no longer read from the code.
         #[starlark(require = named)] extension_points: Option<UnpackList<&'v ExtensionPointRecord>>,
-        #[starlark(require = named)] fills: Option<&str>,
+        #[starlark(require = named)] implements: Option<&str>,
+        // The keyword before 2026-10-02. Accepted only to say what it became:
+        // `implements` read as a verb about data, and a plugin *implements* its
+        // host's extension point -- the word eCos CDL uses for the same role.
+        #[starlark(require = named)] fills: Option<starlark::values::Value<'v>>,
         #[starlark(require = named)] docs: Option<&'v DocsRecord>,
         #[starlark(require = named)] provides: Option<UnpackList<&'v ProvideRecord>>,
         #[starlark(require = named)] consumes: Option<UnpackList<&'v ConsumeRecord>>,
@@ -448,7 +481,8 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] config_schema: Option<&'v ConfigRecord>,
         #[starlark(require = named)] cargo_features: Option<UnpackList<&'v FeatureRecord>>,
         // Accepted only to be refused by name, so the diagnostic can say which
-        // attribute owns the fact instead of "unknown argument".
+        // attribute owns the fact instead of "unknown argument" -- except `id`
+        // on a design gear, which has no attribute to project it from.
         #[starlark(require = named)] id: Option<&str>,
         #[starlark(require = named)] runtime_caps: Option<UnpackList<&'v GdlEnum>>,
         #[starlark(require = named)] colocated_deps: Option<UnpackList<String>>,
@@ -459,8 +493,77 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] cluster_providers: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
+        if fills.is_some() {
+            return Err(anyhow::anyhow!(
+                "`fills` was renamed to `implements`: write `implements = \"<spec>~\"`"
+            ));
+        }
+
+        let maturity = match maturity {
+            None => {
+                return Err(anyhow::anyhow!(
+                    "a gear declares its maturity: `maturity = \"experimental\" | \"preview\" | \
+                     \"stable\" | \"deprecated\"`, or `\"design\"` for a gear with no code yet. \
+                     There is no default, because `stable` would be a promise nobody made"
+                ));
+            }
+            Some(spelling) => Maturity::parse(spelling).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "unknown maturity `{spelling}`: expected one of {}",
+                    Maturity::SPELLINGS
+                        .iter()
+                        .map(|s| format!("\"{s}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })?,
+        };
+
+        if maturity == Maturity::Design {
+            // What a design gear may say is what `gear.toml` said, plus where
+            // its SDK and documents are: everything else describes code.
+            for (present, field) in [
+                (package.is_some(), "package"),
+                (visibility.is_some(), "visibility"),
+                (extension_points.is_some(), "extension_points"),
+                (implements.is_some(), "implements"),
+                (provides.is_some(), "provides"),
+                (consumes.is_some(), "consumes"),
+                (requires.is_some(), "requires"),
+                (serves.is_some(), "serves"),
+                (cluster_plugins.is_some(), "cluster_plugins"),
+                (roles.is_some(), "roles"),
+                (config_schema.is_some(), "config_schema"),
+                (cargo_features.is_some(), "cargo_features"),
+                (runtime_caps.is_some(), "runtime_caps"),
+                (colocated_deps.is_some(), "colocated_deps"),
+                (lifecycle.is_some(), "lifecycle"),
+                (client.is_some(), "client"),
+                (cluster_providers.is_some(), "cluster_providers"),
+            ] {
+                if present {
+                    return Err(anyhow::anyhow!(
+                        "`{field}` describes code, and a design gear has none yet: remove it, \
+                         or declare `package = cargo(...)` and drop `maturity = \"design\"`"
+                    ));
+                }
+            }
+            let Some(id) = id else {
+                return Err(anyhow::anyhow!(
+                    "a design gear names its own id: write `id = \"<kebab-case>\"`. There is \
+                     no `#[toolkit::gear(name = ...)]` to project it from yet"
+                ));
+            };
+            gearbox_ir::GearId::new(id)
+                .map_err(|e| anyhow::anyhow!("`{id}` is not a valid gear id: {e}"))?;
+        }
+
         for (present, field, owner) in [
-            (id.is_some(), "id", "#[toolkit::gear(name = ...)]"),
+            (
+                id.is_some() && maturity != Maturity::Design,
+                "id",
+                "#[toolkit::gear(name = ...)]",
+            ),
             (
                 runtime_caps.is_some(),
                 "runtime_caps",
@@ -488,21 +591,23 @@ fn gdl_vocabulary(builder: &mut GlobalsBuilder) {
             }
         }
 
-        if let Some(spec) = fills {
-            check_plugin_spec("fills", spec)?;
+        if let Some(spec) = implements {
+            check_plugin_spec("implements", spec)?;
         }
 
         sink(eval)?.set_gear(GearDecl {
+            maturity: Some(maturity),
+            id: id.filter(|_| maturity == Maturity::Design).map(str::to_owned),
             name: name.map(str::to_owned),
             description: description.map(str::to_owned),
             category: category.map(str::to_owned),
             visibility: visibility.map(str::to_owned),
-            package: Some(package.clone()),
+            package: package.cloned(),
             sdk: sdk.cloned(),
             extension_points: extension_points
                 .map(|l| l.items.into_iter().cloned().collect())
                 .unwrap_or_default(),
-            fills: fills.map(str::to_owned),
+            implements: implements.map(str::to_owned),
             docs: docs.cloned(),
             provides: provides
                 .map(|l| l.items.into_iter().cloned().collect())

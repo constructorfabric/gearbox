@@ -21,7 +21,7 @@
 // the resolver wrote when it created the edge, while it still knew the specifics
 // (`cpt-gearbox-fr-explain`). This walks and prints.
 
-import { fillLabel, pointKey, pointLabel, specSegment } from "../../common/extension-points";
+import { implementsLabel, pointKey, pointLabel, specSegment } from "../../common/extension-points";
 import { codicon, ReactWidget } from "@theia/core/lib/browser";
 import { inject, injectable, postConstruct } from "@theia/core/shared/inversify";
 import { CommandRegistry } from "@theia/core";
@@ -218,6 +218,39 @@ export class InspectorWidget extends ReactWidget {
       );
     }
 
+    if (row.kind === "design") {
+      // Complete, not waiting: there is nothing to parse. What it lacks is
+      // code, and saying so is why it has no "Add to product".
+      return (
+        <div className="gbx-detail" data-design-gear={row.gear.id}>
+          <div className="gbx-detail-title">
+            {row.gear.display_name}
+            <span className="gbx-badge gbx-design">design</span>
+          </div>
+          <div className="gbx-kv">
+            <span>id</span>
+            <span>
+              <code>{row.gear.id}</code>
+            </span>
+          </div>
+          <div className="gbx-kv">
+            <span>description</span>
+            <span>{row.gear.description ?? "—"}</span>
+          </div>
+          <div className="gbx-kv">
+            <span>category</span>
+            <span>{row.gear.category ?? "—"}</span>
+          </div>
+          <GearDocs descriptor={row.gear} reveals={this.reveals} />
+          {this.renderPath(row.gear.source, row.gear.gdl_path)}
+          <div className="gbx-empty">
+            Described at design maturity: there is no crate yet, so it cannot be added to a
+            product. Its documents say what is planned.
+          </div>
+        </div>
+      );
+    }
+
     return (
       <>
         {this.renderProjected(row.gear)}
@@ -321,25 +354,25 @@ export class InspectorWidget extends ReactWidget {
           </div>
         )}
 
-        {gear.fills && (
+        {gear.implements && (
           <div className="gbx-kv">
-            <span>fills</span>
+            <span>implements</span>
             <span>
-              <code>{fillLabel(gear.fills)}</code>
-              {!gear.fills.point && (
-                <span className="gbx-muted" data-fills-unjoined="true">
+              <code>{implementsLabel(gear.implements)}</code>
+              {!gear.implements.point && (
+                <span className="gbx-muted" data-implements-unjoined="true">
                   {" "}
                   -- no described host declares it
                 </span>
               )}
-              {gear.fills.default_vendor !== null && gear.fills.default_vendor !== undefined && (
+              {gear.implements.default_vendor !== null && gear.implements.default_vendor !== undefined && (
                 <>
                   {" "}
-                  as vendor <code>{gear.fills.default_vendor}</code>
+                  as vendor <code>{gear.implements.default_vendor}</code>
                 </>
               )}
-              {gear.fills.default_priority !== null && gear.fills.default_priority !== undefined && (
-                <>, priority {gear.fills.default_priority}</>
+              {gear.implements.default_priority !== null && gear.implements.default_priority !== undefined && (
+                <>, priority {gear.implements.default_priority}</>
               )}
             </span>
           </div>

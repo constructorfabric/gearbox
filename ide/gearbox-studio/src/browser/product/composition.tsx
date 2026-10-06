@@ -83,7 +83,7 @@ export function Composition({ state, loadingLabel, descriptors, selection, selec
         const connections = (host.plugins ?? []).map(p => ({
           p,
           entryIndex: p.entry_index,
-          spec: descriptor(p.gear)?.fills?.spec,
+          spec: descriptor(p.gear)?.implements?.spec,
         }));
         const unassigned = connections.filter(c => !c.spec || !points.some(p => p.key === c.spec));
         const renderConnections = (entries: typeof connections) => entries.map(({ p, entryIndex }) => {

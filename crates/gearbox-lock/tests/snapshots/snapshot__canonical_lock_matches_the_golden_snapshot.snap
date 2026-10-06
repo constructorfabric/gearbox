@@ -12,7 +12,7 @@ profile = "local"
 profile_kind = "self-hosted"
 layout = "apps"
 gearbox_version = "0.1.0"
-lock_hash = "blake3:982212c62c1d9f1bc88e8c0f301b885e63172fbb1cac2a2e7daaa7a07aabd3c9"
+lock_hash = "blake3:98b5ea49b705b44de9df40011cfa61a8e5faf40c44204d487bc6726b505e7d60"
 
 [self_hosted]
 target_dir = "../../../gears-rust/target"
@@ -220,7 +220,7 @@ provider_application = "gateway"
 mode = "remote"
 transport = "rest"
 mechanism = "consumes-directory"
-endpoint_source = "directory:gear-orchestrator/api-contracts"
+endpoint_source = "directory:service-discovery/api-contracts"
 critical = false
 
 [bindings.selected.selected]
@@ -239,7 +239,7 @@ provider_application = "gateway"
 mode = "remote"
 transport = "rest"
 mechanism = "consumes-directory"
-endpoint_source = "directory:gear-orchestrator/api-contracts"
+endpoint_source = "directory:service-discovery/api-contracts"
 critical = false
 
 [bindings.selected.selected]

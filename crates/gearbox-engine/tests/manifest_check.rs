@@ -23,6 +23,7 @@ fn gear_gdl(crate_name: &str, lib: &str) -> String {
     format!(
         r#"
 gear(
+    maturity = "stable",
     name = "Thing",
     description = "A thing.",
     category = "core-functionality",

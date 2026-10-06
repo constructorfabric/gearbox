@@ -309,6 +309,10 @@ gear(
     # `gear()` accepts each of those names only in order to refuse it by name --
     # so the diagnostic can say which attribute owns the fact.
 
+    # Required, no default: experimental | preview | stable | deprecated, or
+    # "design" for a gear with no code yet.
+    maturity = "preview",
+
     name = "Contracts & Agreements",
 
     description = """
@@ -339,9 +343,12 @@ gear(
 )
 ```
 
-There is no `gear.toml` to migrate away from: `find . -name gear.toml` over `gears-rust` returns
-nothing. Descriptive metadata of that shape exists nowhere today, which is exactly what makes
-`gear.gdl` genuinely new information rather than a re-encoding of something already written down.
+There is no `gear.toml` to migrate away from. When this was written, `find . -name gear.toml` over
+`gears-rust` returned nothing. The platform later added 41 of them for catalogue discovery, read by
+no code; they carried a name, a description, a category and three role flags, and were folded into
+`gear.gdl` (ADR-0002, Amendment 2026-10-02): the three descriptive fields moved as they were, the
+flags follow from what a description declares, and a gear with only documents is described at
+`maturity = "design"`.
 
 ---
 
@@ -360,6 +367,7 @@ The display name is what `gear.gdl` adds:
 ```python
 gear(
     name = "Contracts & Agreements",
+    maturity = "preview",
 )
 ```
 
@@ -454,6 +462,7 @@ Good:
 ```python
 gear(
     name = "Event Broker",
+    maturity = "preview",
     package = cargo(crate_name = "cf-event-broker", lib = "event_broker"),
 
     requires = [
@@ -705,7 +714,7 @@ descriptor reads it instead of restating it.
 | `identity` | `#[toolkit::gear(name = ...)]`. `gear(id = ...)` is accepted only to be refused, naming the attribute that owns it. |
 | `hard dependencies` | `#[toolkit::gear(deps = [...])]` -- the attribute that *emits the re-exports*, so a description evaluated before `rustc` could not replace it (§17). |
 | `capability requirements` | `#[toolkit::gear(capabilities = [...])]`, which drives compile-time assertions. |
-| `kind` / `plugin/extensibility model` | Declared by GTS plugin spec (`extension_point(...)`, `fills`) and checked against the SDK. First read from `pub trait *Plugin*` declarations, which the corpus falsified five ways (ADR-0002, Amendment 2026-09-24); `has_extension_point` as an unchecked boolean was one of three facts found to be quietly wrong. |
+| `kind` / `plugin/extensibility model` | Declared by GTS plugin spec (`extension_point(...)`, `implements`) and checked against the SDK. First read from `pub trait *Plugin*` declarations, which the corpus falsified five ways (ADR-0002, Amendment 2026-09-24); `has_extension_point` as an unchecked boolean was one of three facts found to be quietly wrong. |
 | contract `identity` and `version` | `#[toolkit::contract(gear = ..., version = ...)]` on the trait. `provide`/`consume` name the trait as a *join key* and add only what the attribute does not carry. |
 | available transports | Projected from which `<Base>Rest` / `<Base>Grpc` projection traits exist beside the base. A contract with no projection is provably local, and no description can say otherwise. |
 
@@ -2677,7 +2686,8 @@ Cargo features
 handwritten registration code
 ```
 
-There is no `gear.toml`; that file does not exist in the repository.
+There is no `gear.toml`: the descriptive files the platform added for a while were folded into
+`gear.gdl` (ADR-0002, Amendment 2026-10-02).
 
 Adopting Gearbox is **additive**. No attribute is migrated away from, rewritten, or
 deleted. The attributes keep every fact they already carry, and `gear.gdl` is added beside the crate

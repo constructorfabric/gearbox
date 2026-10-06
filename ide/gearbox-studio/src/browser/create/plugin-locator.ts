@@ -161,7 +161,7 @@ export function pluginLocatorFor(request: LocatorRequest): LocatorOutcome {
     kind: "ready",
     scaffold: {
       // The declaration that makes the new gear a plugin: the spec the host
-      // declares, as `fills` writes it.
+      // declares, as `implements` writes it.
       spec: specSegment(chosen.point.spec),
       trait_ident: chosen.point.trait_ident,
       crate_name: sdk.crate_name,

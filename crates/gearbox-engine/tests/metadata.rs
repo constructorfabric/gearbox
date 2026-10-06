@@ -58,12 +58,14 @@ fn gear<'a>(c: &'a Catalogue, id: &str) -> &'a gearbox_ir::GearDescriptor {
 ///
 /// Written down here rather than read from disk on purpose: `gear.toml` landed on
 /// `main` after this checkout, so the values were taken from the repository and
-/// pinned. If they change, this test is where the disagreement surfaces.
+/// pinned. The files are gone now -- folded into each `gear.gdl` (ADR-0002,
+/// Amendment 2026-10-02) -- and the pins are what proves the move kept them.
+/// If they change, this test is where the disagreement surfaces.
 const PLATFORM_CATEGORIES: &[(&str, &str)] = &[
     ("api-gateway", "api-ingress"),
     ("authn-resolver", "core-platform-integration"),
     ("cluster", "serverless"),
-    ("gear-orchestrator", "core-functionality"),
+    ("service-discovery", "core-functionality"),
     ("grpc-hub", "core-functionality"),
     ("tenant-resolver", "core-platform-integration"),
     ("types-registry", "core-functionality"),
@@ -117,6 +119,7 @@ const CATEGORY_MANIFEST: &str = "[package]\nname = \"demo\"\nversion = \"0.1.0\"
 /// The `gear.gdl` text for a gear declaring `category = "bogus"`.
 const UNKNOWN_CATEGORY_GEAR_GDL: &str = r#"
 gear(
+    maturity = "stable",
     name = "Demo",
     description = "d",
     category = "bogus",
@@ -233,7 +236,9 @@ fn an_openapi_spec_is_claimed_only_by_the_gears_that_have_one() {
     // for none of the others. Describing the rest of the corpus added two more
     // that are real: `gears/chat-engine/docs/openapi.json` and
     // `gears/mini-chat/docs/openapi.json` -- and none for the other thirty-nine
-    // gears, mini-chat's two co-located plugins included.
+    // gears, mini-chat's two co-located plugins included. mini-chat's spec was
+    // later removed from the corpus (gears-rust 00e182646), and its claim with
+    // it: the convention follows the file, not a memory of it.
     let c = require!();
     let claimed: Vec<&str> = c
         .gears
@@ -243,13 +248,7 @@ fn an_openapi_spec_is_claimed_only_by_the_gears_that_have_one() {
         .collect();
     assert_eq!(
         claimed,
-        [
-            "chat-engine",
-            "credstore",
-            "event-broker",
-            "mini-chat",
-            "resource-group"
-        ],
+        ["chat-engine", "credstore", "event-broker", "resource-group"],
         "openapi claims moved"
     );
 }

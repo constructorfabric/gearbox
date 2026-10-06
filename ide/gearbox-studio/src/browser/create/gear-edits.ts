@@ -86,8 +86,8 @@ export function placeNewGear(placement: NewGearPlacement, productLabel: string):
       return {
         ok: false,
         reason:
-          `${placement.gearId} is a plugin, so it goes inside the gear it fills. Choose what it ` +
-          `fills, or create it on its own and add it to a product later.`,
+          `${placement.gearId} is a plugin, so it goes inside the gear it implements a point of. Choose which point it ` +
+          `implements, or create it on its own and add it to a product later.`,
       };
     }
     return { ok: true, edits: [declare, select(placement.gearId, placement.sourceId)] };

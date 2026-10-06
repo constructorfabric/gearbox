@@ -37,9 +37,9 @@ fn detects_an_added_gear() {
     let before = support::fixture();
     let mut after = support::fixture();
 
-    // Adding gear-orchestrator as a new, unrelated gear and process (not
+    // Adding service-discovery as a new, unrelated gear and process (not
     // wired into any binding) isolates the "added" case from "changed".
-    let id = GearId::new("gear-orchestrator").unwrap();
+    let id = GearId::new("service-discovery").unwrap();
     let mut gear = after
         .gears
         .get(&GearId::new("api-contracts").unwrap())
@@ -51,7 +51,7 @@ fn detects_an_added_gear() {
     let d = gearbox_lock::diff(&before, &after);
     assert_eq!(
         d.gears_added,
-        vec![GearId::new("gear-orchestrator").unwrap()]
+        vec![GearId::new("service-discovery").unwrap()]
     );
     assert!(d.gears_removed.is_empty());
     assert!(d.gears_changed.is_empty());

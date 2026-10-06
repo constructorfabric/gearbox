@@ -40,6 +40,7 @@ PAYMENT_SDK = cargo(
 )
 
 gear(
+    maturity = "stable",
     name = "Payments (example provider)",
     category = "example",
     visibility = "public",
@@ -110,6 +111,7 @@ fn consume_declares_the_product_level_facts_only() {
     let src = r#"
 SDK = cargo(crate_name = "s", lib = "s")
 gear(
+    maturity = "stable",
     package = cargo(crate_name = "c", lib = "c"),
     consumes = [
         consume(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK,
@@ -137,6 +139,7 @@ fn from_is_refused_because_the_attribute_owns_the_directory_key() {
     let src = r#"
 SDK = cargo(crate_name = "s", lib = "s")
 gear(
+    maturity = "stable",
     package = cargo(crate_name = "c", lib = "c"),
     consumes = [
         consume(contract = "PaymentApi", rust = "s::PaymentApi", sdk = SDK,
@@ -153,6 +156,7 @@ gear(
 fn cluster_capabilities_resolve_against_their_primitive() {
     let src = r#"
 gear(
+    maturity = "stable",
     package = cargo(crate_name = "c", lib = "c"),
     requires = [
         cluster.cache(profile = "default", capabilities = [cluster_cap.linearizable]),
@@ -175,7 +179,7 @@ gear(
 #[test]
 fn prefix_watch_is_refused_on_a_lock_because_it_is_a_cache_property() {
     let src = r#"
-gear(package = cargo(crate_name = "c", lib = "c"),
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"),
      requires = [cluster.lock(capabilities = [cluster_cap.prefix_watch])])
 "#;
     let (value, codes) = eval(src);
@@ -187,7 +191,7 @@ gear(package = cargo(crate_name = "c", lib = "c"),
 fn a_value_from_the_wrong_namespace_is_refused() {
     // The namespace tag is what catches this: a bare string could not.
     let src = r#"
-gear(package = cargo(crate_name = "c", lib = "c"),
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"),
      requires = [cluster.cache(capabilities = [transport.rest])])
 "#;
     let (value, codes) = eval(src);
@@ -198,7 +202,7 @@ gear(package = cargo(crate_name = "c", lib = "c"),
 #[test]
 fn a_role_records_its_name_its_directory_name_and_its_label_keys() {
     let src = r#"
-gear(package = cargo(crate_name = "c", lib = "c"),
+gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"),
      roles = [
          role(name = "dispatcher", directory_name = "event-broker"),
          role(name = "ingest", labels = ["shard"]),
@@ -222,7 +226,7 @@ gear(package = cargo(crate_name = "c", lib = "c"),
 
 #[test]
 fn a_missing_package_is_an_error_because_it_locates_the_crate_to_scan() {
-    let (value, codes) = eval(r#"gear(name = "Demo")"#);
+    let (value, codes) = eval(r#"gear(maturity = "stable", name = "Demo")"#);
     assert!(value.is_none());
     // The macro rejects the call outright for a missing required argument.
     assert!(!codes.is_empty(), "a missing package must be reported");
@@ -235,8 +239,8 @@ fn zero_and_two_declarations_are_both_cardinality_errors() {
     assert_eq!(codes, [DiagnosticCode::GdlCardinality]);
 
     let two = r#"
-gear(package = cargo(crate_name = "a", lib = "a"))
-gear(package = cargo(crate_name = "b", lib = "b"))
+gear(maturity = "stable", package = cargo(crate_name = "a", lib = "a"))
+gear(maturity = "stable", package = cargo(crate_name = "b", lib = "b"))
 "#;
     let (_, codes) = eval(two);
     assert!(codes.contains(&DiagnosticCode::GdlCardinality), "{codes:?}");
@@ -244,7 +248,7 @@ gear(package = cargo(crate_name = "b", lib = "b"))
 
 #[test]
 fn a_forbidden_construct_reports_every_occurrence() {
-    let src = r#"gear(package = cargo(crate_name = "c" if True else "d", lib = "c"))"#;
+    let src = r#"gear(maturity = "stable", package = cargo(crate_name = "c" if True else "d", lib = "c"))"#;
     let (value, codes) = eval(src);
     assert!(value.is_none());
     assert!(
@@ -258,7 +262,7 @@ fn a_forbidden_construct_reports_every_occurrence() {
 
 #[test]
 fn a_syntax_error_carries_a_span() {
-    let out = GdlEngine::new().eval_gear(&identity(), "gear(package = \n");
+    let out = GdlEngine::new().eval_gear(&identity(), "gear(maturity = \"stable\", package = \n");
     assert!(out.value.is_none());
     let diags = out.diagnostics.as_slice();
     assert_eq!(diags[0].code, DiagnosticCode::GdlParse);
@@ -273,12 +277,149 @@ fn every_diagnostic_satisfies_the_prd_invariants() {
     for src in [
         API_CONTRACTS,
         "X = 1\n",
-        r#"gear(package = cargo(crate_name = "c", lib = "c"), id = "x")"#,
-        r#"gear(package = cargo(crate_name = "c", lib = "c"), nope = 1)"#,
+        r#"gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"), id = "x")"#,
+        r#"gear(maturity = "stable", package = cargo(crate_name = "c", lib = "c"), nope = 1)"#,
     ] {
         let out = GdlEngine::new().eval_gear(&identity(), src);
         for d in &out.diagnostics {
             assert!(d.validate().is_ok(), "{:?} -> {:?}", d.code, d.validate());
         }
+    }
+}
+
+#[test]
+fn a_plugin_implements_its_hosts_point() {
+    let (decl, codes) = eval(
+        r#"gear(maturity = "stable", package = cargo(crate_name = "p", lib = "p"), implements = "cf.core.authn_resolver.plugin.v1~")"#,
+    );
+    assert!(codes.is_empty(), "{codes:?}");
+    assert_eq!(
+        decl.expect("evaluates").implements.as_deref(),
+        Some("cf.core.authn_resolver.plugin.v1~")
+    );
+}
+
+#[test]
+fn the_old_fills_keyword_names_what_it_became() {
+    // Renamed without an alias, so a description written before the rename
+    // fails -- and the message is the whole migration.
+    let out = GdlEngine::new().eval_gear(
+        &identity(),
+        r#"gear(maturity = "stable", package = cargo(crate_name = "p", lib = "p"), fills = "cf.core.authn_resolver.plugin.v1~")"#,
+    );
+    assert!(out.value.is_none());
+    let message = &out.diagnostics.as_slice()[0].message;
+    assert!(
+        message.contains("`fills` was renamed to `implements`"),
+        "got: {message}"
+    );
+}
+
+/// The message of the first diagnostic, for the refusal tests below.
+fn refusal(src: &str) -> String {
+    let out = GdlEngine::new().eval_gear(&identity(), src);
+    assert!(out.value.is_none(), "`{src}` should not evaluate");
+    out.diagnostics.as_slice()[0].message.clone()
+}
+
+#[test]
+fn a_design_gear_names_its_id_and_has_no_package() {
+    let (decl, codes) = eval(
+        r#"gear(maturity = "design", id = "approval-service", name = "Approval Service",
+                sdk = cargo(crate_name = "approval-sdk", lib = "approval_sdk", path = "sdk"))"#,
+    );
+    assert!(codes.is_empty(), "{codes:?}");
+    let decl = decl.expect("evaluates");
+    assert_eq!(decl.maturity, Some(gearbox_gdl::Maturity::Design));
+    assert_eq!(decl.id.as_deref(), Some("approval-service"));
+    assert!(decl.package.is_none());
+}
+
+#[test]
+fn a_design_gear_without_an_id_is_refused() {
+    let message = refusal(r#"gear(maturity = "design", name = "X")"#);
+    assert!(message.contains("names its own id"), "got: {message}");
+}
+
+#[test]
+fn a_design_gear_id_must_be_a_gear_id() {
+    let message = refusal(r#"gear(maturity = "design", id = "Not Kebab")"#);
+    assert!(message.contains("not a valid gear id"), "got: {message}");
+}
+
+#[test]
+fn a_design_gear_refuses_what_describes_code() {
+    for field in [
+        r#"package = cargo(crate_name = "p", lib = "p")"#,
+        r#"implements = "cf.core.authn_resolver.plugin.v1~""#,
+        "runtime_caps = [cap.rest]",
+        r#"visibility = "public""#,
+    ] {
+        let message = refusal(&format!(r#"gear(maturity = "design", id = "x", {field})"#));
+        assert!(
+            message.contains("a design gear has none yet"),
+            "`{field}`: got {message}"
+        );
+    }
+}
+
+#[test]
+fn an_unknown_maturity_is_refused() {
+    let message = refusal(
+        r#"gear(maturity = "planned", package = cargo(crate_name = "p", lib = "p"))"#,
+    );
+    assert!(message.contains("unknown maturity `planned`"), "got: {message}");
+}
+
+#[test]
+fn a_stable_gear_still_may_not_restate_its_id() {
+    let (_, codes) = eval(
+        r#"gear(maturity = "stable", id = "x", package = cargo(crate_name = "p", lib = "p"))"#,
+    );
+    assert_eq!(codes, [DiagnosticCode::ValidateRestatement]);
+}
+
+#[test]
+fn maturity_is_required() {
+    let message = refusal(r#"gear(package = cargo(crate_name = "p", lib = "p"))"#);
+    assert!(message.contains("a gear declares its maturity"), "got: {message}");
+}
+
+#[test]
+fn every_level_of_a_gear_with_code_is_accepted() {
+    for (spelling, level) in [
+        ("experimental", gearbox_ir::Maturity::Experimental),
+        ("preview", gearbox_ir::Maturity::Preview),
+        ("stable", gearbox_ir::Maturity::Stable),
+        ("deprecated", gearbox_ir::Maturity::Deprecated),
+    ] {
+        let (decl, codes) = eval(&format!(
+            r#"gear(maturity = "{spelling}", package = cargo(crate_name = "p", lib = "p"))"#
+        ));
+        assert!(codes.is_empty(), "{spelling}: {codes:?}");
+        assert_eq!(
+            decl.expect("evaluates").maturity,
+            Some(gearbox_gdl::Maturity::Code(level))
+        );
+    }
+}
+
+#[test]
+fn an_extension_point_selector_is_a_dotted_field_path() {
+    let point = |selector: &str| {
+        format!(
+            r#"gear(maturity = "stable", package = cargo(crate_name = "p", lib = "p"), sdk = cargo(crate_name = "s", lib = "s"),
+                extension_points = [extension_point("cf.core.idp.plugin.v1~", trait = "T", selector = "{selector}")])"#
+        )
+    };
+    let (decl, codes) = eval(&point("idp.vendor"));
+    assert!(codes.is_empty(), "{codes:?}");
+    assert_eq!(
+        decl.expect("evaluates").extension_points[0].selector.as_deref(),
+        Some("idp.vendor")
+    );
+    for bad in ["", "idp..vendor", "Idp.vendor", "idp.vendor!"] {
+        let message = refusal(&point(bad));
+        assert!(message.contains("dotted path of config field names"), "`{bad}`: {message}");
     }
 }

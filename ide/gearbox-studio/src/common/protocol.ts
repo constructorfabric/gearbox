@@ -35,6 +35,7 @@ import type { ValidateResult } from "./generated/ValidateResult";
 import type { Diagnostic } from "./generated/Diagnostic";
 import type { FailedRoot } from "./generated/FailedRoot";
 import type { GearDescriptor } from "./generated/GearDescriptor";
+import type { DesignGear } from "./generated/DesignGear";
 import type { InitializeResult } from "./generated/InitializeResult";
 import type { PendingGear } from "./generated/PendingGear";
 import type { ProgressParams } from "./generated/ProgressParams";
@@ -376,7 +377,7 @@ export interface GearboxService {
     /** Which shape to write; the engine defaults to `minimal` when absent. */
     kind?: GearKind;
     /**
-     * What a `plugin` scaffold fills, when a host has been chosen.
+     * What a `plugin` scaffold implements, when a host has been chosen.
      *
      * Absent keeps the engine's commented locator, which exists because an `sdk`
      * pointing nowhere makes the gear fail to load. Present means the host came
@@ -571,7 +572,11 @@ export interface GearboxClient {
  */
 export type Row =
   | { readonly kind: "pending"; readonly gear: PendingGear }
-  | { readonly kind: "projected"; readonly gear: GearDescriptor };
+  | { readonly kind: "projected"; readonly gear: GearDescriptor }
+  // Described with `maturity = "design"`: complete as declared and never
+  // projected, so it arrives with the load result and stays this kind. Not a
+  // gear a product can use -- every reader that wants one asks for "projected".
+  | { readonly kind: "design"; readonly gear: DesignGear };
 
 /**
  * What a row is keyed by, and it is never the id.

@@ -74,7 +74,7 @@ fn pid(s: &str) -> ProfileId {
 fn the_embedded_profile_holds_the_whole_product() {
     // Not the anchor's closure: a selected gear that nothing depends on still has
     // to run, and in one process there is nowhere else for it to be. Getting this
-    // wrong drops `gear-orchestrator` and `api-contracts` silently.
+    // wrong drops `service-discovery` and `api-contracts` silently.
     require!(cat, prod);
     let r = resolve(&cat, &prod, &pid("dev"));
 

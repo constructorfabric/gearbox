@@ -1111,7 +1111,7 @@ fn require_gdl_identifier(uri: &str, name: &str, what: &str) -> Result<(), Diagn
 /// without trouble. Every caller now reads this one table.
 ///
 /// `static` is not a free choice: the lowering accepts exactly `static` and
-/// `directory`, and `directory` makes the resolver demand `gear-orchestrator`
+/// `directory`, and `directory` makes the resolver demand `service-discovery`
 /// and `grpc-hub` in the host process, which a product that was just created has
 /// not selected. `profile_scaffolds_evaluate` in `tests/product.rs` holds these
 /// values to evaluating on their own.

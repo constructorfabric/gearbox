@@ -56,6 +56,55 @@ test.describe("product session and Add Gear", () => {
     });
     await studio.page.locator("[data-add-gear-cancel]").click();
   });
+
+  test("a design gear is listed as a design and is not offered by Add Gear [ADR-0002 Amendment 2026-10-02]", async ({
+    studio,
+  }) => {
+    await openProduct(studio.page, "dev");
+    await revealCatalogue(studio.page);
+    await resetCatalogueView(studio.page);
+
+    // approval-service is described at `maturity = "design"` in the corpus: it
+    // has documents and no crate.
+    const row = studio.page.locator(".gbx-design-row", { hasText: "approval-service" });
+    await expect(row).toBeVisible({ timeout: 60_000 });
+    await expect(row.locator(".gbx-badge.gbx-design")).toHaveText("design");
+    // No catalogue `+`: there is nothing a product could link.
+    await expect(studio.page.locator('[data-toggle-gear="approval-service"]')).toHaveCount(0);
+
+    await studio.page.locator("[data-add-gear]").click();
+    await expect(studio.page.locator("[data-add-gear-flow]")).toBeVisible({ timeout: 30_000 });
+    // The list is populated -- a gear with code the product does not name is
+    // there -- and the design gear is not.
+    await expect(studio.page.locator('[data-add-gear-select="tenant-resolver"]')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(studio.page.locator('[data-add-gear-select="approval-service"]')).toHaveCount(0);
+    await studio.page.locator("[data-add-gear-cancel]").click();
+  });
+
+  test("a gear below stable says so where it is chosen [ADR-0002 Amendment 2026-10-02: maturity is required]", async ({
+    studio,
+  }) => {
+    await openProduct(studio.page, "dev");
+    await revealCatalogue(studio.page);
+    await resetCatalogueView(studio.page);
+
+    // Every gear in the corpus is `maturity = "preview"`: usable, not declared
+    // stable. The catalogue row says it, and so does the Add Gear list, where
+    // the choice is made.
+    const row = studio.page.locator(".gbx-row", { hasText: "tenant-resolver" }).first();
+    await expect(row.locator('[data-maturity="preview"]')).toHaveText("preview", {
+      timeout: 60_000,
+    });
+
+    await studio.page.locator("[data-add-gear]").click();
+    await expect(studio.page.locator("[data-add-gear-flow]")).toBeVisible({ timeout: 30_000 });
+    await expect(
+      studio.page.locator('[data-add-gear-select="tenant-resolver"] [data-maturity="preview"]'),
+    ).toBeVisible({ timeout: 30_000 });
+    await studio.page.locator("[data-add-gear-cancel]").click();
+  });
 });
 
 // Phase 5's point: the panel answers "what does this do to my product" before it
@@ -115,7 +164,7 @@ test.describe("Add Gear shows consequences before the write", () => {
     // catalogue, chose `oidc-authn-plugin`, and was told it would join the
     // closure as a "plugin of types-registry". The data to refuse that was
     // already on the wire in both directions -- the host's `extension_points`
-    // and the plugin's `fills.point` -- so the offer was the defect.
+    // and the plugin's `implements.point` -- so the offer was the defect.
     const page = studio.page;
     await configure(page, "types-registry");
     await expect(page.locator("[data-add-gear-plugins]")).toBeVisible({ timeout: 60_000 });
@@ -129,7 +178,7 @@ test.describe("Add Gear shows consequences before the write", () => {
     studio,
   }) => {
     // `tenant-resolver` declares one point, and three gears in the corpus fill
-    // it; `oidc-authn-plugin` fills a different SDK's trait and must not be on
+    // it; `oidc-authn-plugin` implements a different SDK's trait and must not be on
     // offer here. The join key is the pair, never a derived short name -- see
     // `common/extension-points.ts`.
     const page = studio.page;
@@ -266,7 +315,7 @@ test.describe("Add Gear shows consequences before the write", () => {
       await revealCatalogue(page);
       await resetCatalogueView(page);
 
-      // `oidc-authn-plugin` fills the point `authn-resolver` declares, and the
+      // `oidc-authn-plugin` implements the point `authn-resolver` declares, and the
       // product has that host -- so this is the case that works.
       await page.locator('[data-toggle-gear="oidc-authn-plugin"]').click();
       await expect(page.locator("[data-add-gear-flow]")).toBeVisible({ timeout: 30_000 });
@@ -314,7 +363,7 @@ test.describe("Add Gear shows consequences before the write", () => {
 
       // **And the host does not survive a change of plugin.** It used to: the
       // next plugin was reported as "already attached to authn-resolver" while
-      // the section above correctly said that host declares no point it fills.
+      // the section above correctly said that host declares no point it implements.
       //
       // Straight to the next candidate, with no "choose a different gear" step.
       // The panel needed one because the picker and the overview shared a slot,

@@ -311,7 +311,7 @@ fn gdl_product_vocabulary(builder: &mut GlobalsBuilder) {
 
     /// `plugin("name", config = {...}, profiles = [...])`
     ///
-    /// Names an implementing gear. Which extension point it fills comes from the
+    /// Names an implementing gear. Which extension point it implements comes from the
     /// catalogue, so there is no `interface` here to get wrong.
     fn plugin<'v>(
         #[starlark(require = pos)] gear: &str,

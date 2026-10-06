@@ -825,8 +825,8 @@ fn tenant_resolver_projects_its_single_vendor_field() {
 /// assert what someone else's struct is allowed to contain.
 ///
 /// **Learned twice.** `gear_orchestrator_reads_no_config_at_all` was the same
-/// mistake in the other direction -- it pinned `gear-orchestrator` to reading
-/// *no* config -- and it went red when that gear grew `OrchestratorConfig` to
+/// mistake in the other direction -- it pinned `gear-orchestrator` (now `service-discovery`) to reading
+/// *no* config -- and it went red when that gear grew `OrchestratorConfig` (now `ServiceDiscoveryConfig`) to
 /// authorize registration RPCs against peer identity. The projector was correct
 /// throughout, so the test was deleted rather than re-pointed: aiming it at
 /// whichever gear has no config today only re-arms it. The `Ok(None)` path is
